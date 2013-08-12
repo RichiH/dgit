@@ -3,17 +3,20 @@ New field in dsc
     url(s) to clone to get history
     commit hash corresponding to the thing uploaded
     optional commit hash corresponding to pristine tar
+ Vcs-git-master: 
 
 dget or something
   fetches dsc
   clones repo
   repros pristine-tar
+what about a git fetch
 
 git-buildpackage
   adds field for master commit hash
   adds field for pristine tar
 
 dupload (?)
+  checks isn't a force push into archive?
   does signature
   does push to server(s)
   adds tags to changes file to promise has pushed
