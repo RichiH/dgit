@@ -1,0 +1,26 @@
+New field in dsc
+  specifies
+    url(s) to clone to get history
+    commit hash corresponding to the thing uploaded
+    optional commit hash corresponding to pristine tar
+
+dget or something
+  fetches dsc
+  clones repo
+  repros pristine-tar
+
+git-buildpackage
+  adds field for master commit hash
+  adds field for pristine tar
+
+dupload (?)
+  does signature
+  does push to server(s)
+  adds tags to changes file to promise has pushed
+  does actual upload
+
+where on alioth upstream
+
+rc bugs for
+  server(s?) not reachable
+  mismatch
