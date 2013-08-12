@@ -1,29 +1,33 @@
 New field in dsc
   specifies
-    url(s) to clone to get history
     commit hash corresponding to the thing uploaded
     optional commit hash corresponding to pristine tar
  Vcs-git-master: 
 
-dget or something
+dgit clone
   fetches dsc
-  clones repo
-  repros pristine-tar
-what about a git fetch
+  clones repo from alioth
+  repros commit if nec. (if no hash in current dsc, check that
+   dsc is after git head and make synthetic commit, otherwise
+   complain)
 
-git-buildpackage
-  adds field for master commit hash
-  adds field for pristine tar
+dgit fetch
+  as above
 
-dupload (?)
-  checks isn't a force push into archive?
-  does signature
-  does push to server(s)
-  adds tags to changes file to promise has pushed
-  does actual upload
+dgit push
+  after git-buildpackage --tag (but no sign)
+  check repo is clean and tag is made
+  signs tag
+  debsign
+  push to alioth (perhaps with merge -s ours)
+  dput
 
 where on alioth upstream
 
 rc bugs for
   server(s?) not reachable
   mismatch
+
+?git-buildpackage
+?  adds field for master commit hash
+?  adds field for pristine tar
