@@ -2,7 +2,7 @@ New field in dsc
   specifies
     commit hash corresponding to the thing uploaded
     optional commit hash corresponding to pristine tar
- Vcs-git-master: 
+ Vcs-git-master: <url>#commit
 
 dgit clone
   fetches dsc
