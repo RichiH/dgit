@@ -1,0 +1,122 @@
+#!/usr/bin/perl -w
+use strict;
+
+use IO::Handle;
+use Data::Dumper;
+use LWP::UserAgent;
+use Dpkg::Control::Hash;
+
+open DEBUG, ">&STDERR" or die $!;
+
+our $pdo = 'http://packages.debian.org/';
+#our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
+our $suite = 'sid';
+our $package = 'userv';
+
+our $aliothname = 'iwj@git.debian.org';
+our $aliothpath = '/git/dgit-test';
+our $alioth_git = 'git+ssh://$aliothname/$aliothpath';
+our $alioth_sshtestbodge = [$aliothname,$aliothpath];
+
+sub mainbranch () { return "$suite"; }
+sub uploadingbranch () { return "uploading/$suite"; }
+
+sub url_get {
+    if (!$ua) {
+	$ua = LWP::UserAgent->new;
+	$ua->env_proxy;
+    }
+print DEBUG "fetching @_...\n";
+    my $r = $ua->get(@_) or die $!;
+    die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
+    return $r->decoded_content();
+}
+
+sub get_archive_dsc () {
+    my $pdourl = "$pdo/source/$suite/$package";
+    my $pdodata = url_get($pdourl);
+    # FFS.  The Debian archive has no sane way to find what 
+    # version is currently the tip in any branch (aka, what
+    # is the current version in any suite).
+    $pdodata =~ m{
+        Download\ \Q$package\E .*
+        \<a\ href=\"([^"&]+([^"/]+\.dsc))\"\>\2\</a\>
+    }msx
+        or die "screenscraping of $pdourl failed :-(\n";
+    my $dscurl = $1;
+print DEBUG Dumper($pdodata, $&, $dscurl);
+    my $dscdata = url_get($dscurl);
+    my $dscfh = new IO::File \$dscdata, '<' or die $!;
+print DEBUG Dumper($dscdata, $dscfh);
+    my $dscp = Dpkg::Control::Hash->new(allow_pgp=>1);
+    $dscp->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
+    mu $dscf = $dscp->{'fields'};
+    die "unsupported format $dscf->{Format}, sorry\n"
+	unless $dscf->{Format} eq '1.0';
+    return $dsc;
+}
+
+sub check_for_git () {
+    # returns 0 or 1
+    open P, "ssh $alioth_sshtestbodge->[0] '".
+	"set -e; cd /git/dgit-test;".
+	"if test -d $package.git; then echo 1; else echo 0; fi".
+	"' |"
+	or die $!;
+    $!=0; $?=0;
+    my $r = <P>; close P;
+    die "$r $! $?" unless $r =~ m/^[01]$/;
+    return !!$r;
+}
+
+sub runcmd {
+    $!=0; $?=0;
+    die "$! $?" if system @_;
+}
+
+our ($dsc,$dsc_hash);
+
+sub combine () {
+    if (defined $dsc_hash) {
+	
+
+	open P, "-|", qw(git rev-parse --), $dsc_hash;
+	
+}
+
+sub clone () {
+    $dsc = get_archive_dsc();
+    $dsc_hash = $dsc->{Vcs-git-master};
+    if (defined $dsh_hash) {
+	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
+	$dsc_hash = $&;
+    }
+    my $dstdir = "$package";
+    if (check_for_git()) {
+	runcmd qw(git clone --origin dgit -b), $suite, '--',
+	    $alioth_git, $dstdir;
+	chdir "$dstdir" or die "$dstdir $!";
+	combine();
+    } else {
+	mkdir $dstdir or die "$dstdir $!";
+	chdir "$dstdir" or die "$dstdir $!";
+	runcmd qw(git init);
+	open H, "> .git/refs/HEAD" or die $!;
+	print H "ref: refs/heads/$suite\n" or die $!;
+	close H or die $!;
+	runcmd qw(git remote add dgit), $alioth_git;
+	runcmd "git config branch.$suite.remote dgit";
+	runcmd "git config branch.$suite.merge refs/heads/$suite";
+	combine();
+    }
+}
+
+sub fetch () {
+    my ($archive_or_mirror, $suite, $package) = @_;
+    my $dsc = get_archive_dsc();
+    
+    with_tmpdir($td,{
+	
+    });
+
+print Dumper(get_archive_dsc());

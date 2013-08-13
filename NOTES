@@ -20,7 +20,11 @@ dgit push
   signs tag
   debsign
   push to alioth (perhaps with merge -s ours)
+    to "uploading" tag or branch
+       <suite>
+       uploading/<suite>
   dput
+  push to alioth to main tag or branch
 
 where on alioth upstream
 

@@ -1,0 +1,9 @@
+Do not screenscrape p.d.o use rmadison ?
+
+Make it possible to do dgit clone / fetch anonymously
+
+Archive agility.  Archive needs to specify (a) way to get versions
+and paths in archive for dscs (b) unpriv pull location (c) priv
+push location
+
+Support mirrors for source download
