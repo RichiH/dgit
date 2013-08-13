@@ -10,8 +10,7 @@ use POSIX;
 
 open DEBUG, ">&STDERR" or die $!;
 
-our $pdo = 'http://packages.debian.org/';
-#our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
+our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
 our $package;
 
@@ -65,17 +64,18 @@ sub parsecontrol {
 }
 
 sub get_archive_dsc () {
-    my $pdourl = "$pdo/source/$suite/$package";
-    my $pdodata = url_get($pdourl);
-    # FFS.  The Debian archive has no sane way to find what 
-    # version is currently the tip in any branch (aka, what
-    # is the current version in any suite).
-    $pdodata =~ m{
-        Download\ \Q$package\E .*
-        \<a\ href=\"([^"&]+([^"/]+\.dsc))\"\>\2\</a\>
-    }msx
-        or die "screenscraping of $pdourl failed :-(\n";
-    $dscurl = $1;
+    my $rmad = cmdoutput qw(rmadison -asource),"-s$suite",$package;
+    $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* /x or die "$rmad $?";
+    $1 eq $package or die "$rmad $package ?";
+    my $vsn = $2;
+    $3 eq $suite or die "$rmad $suite ?";
+    $4 eq 'source' or die "$rmad ?";
+    # fixme it does not show us the component ?
+    my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
+    $dscurl = "$mirror/pool/main/$prefix/$package/${package}_$vsn.dsc";
 #print DEBUG Dumper($pdodata, $&, $dscurl);
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;

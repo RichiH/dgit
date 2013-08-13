@@ -1,4 +1,6 @@
-Do not screenscrape p.d.o use rmadison ?
+Cope with outside-main things (rmadison does not print pool path)
+
+Cope with non-Debian archives
 
 Make it possible to do dgit clone / fetch anonymously
 
