@@ -22,7 +22,7 @@ dgit push
   push to alioth (perhaps with merge -s ours)
     to "uploading" tag or branch
        <suite>
-       uploading/<suite>
+       upload/<suite>
   dput
   push to alioth to main tag or branch
 
