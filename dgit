@@ -42,6 +42,22 @@ sub url_get {
 
 our ($dscdata,$dscurl,$dsc);
 
+sub runcmd {
+    $!=0; $?=0;
+    die "@_ $! $?" if system @_;
+}
+
+sub cmdoutput {
+    open P, "-|", @_ or die $!;
+    my $d;
+    $!=0; $?=0;
+    { local $/ = undef; $d = <P>; }
+    die if P->error;
+    close P or die "@_ $? $!";
+    chomp $d;
+    return $d;
+}
+
 sub parsecontrol {
     my $c = Dpkg::Control::Hash->new();
     $c->load(@_) or return undef;
@@ -85,22 +101,6 @@ sub check_for_git () {
 #print STDERR ">$r<\n";
     die "$r $! $?" unless $r =~ m/^[01]$/;
     return $r+0;
-}
-
-sub runcmd {
-    $!=0; $?=0;
-    die "@_ $! $?" if system @_;
-}
-
-sub cmdoutput {
-    open P, "-|", @_ or die $!;
-    my $d;
-    $!=0; $?=0;
-    { local $/ = undef; $d = <P>; }
-    die if P->error;
-    close P or die "@_ $? $!";
-    chomp $d;
-    return $d;
 }
 
 our ($dsc_hash,$lastupl_hash);
