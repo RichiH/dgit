@@ -11,7 +11,7 @@ open DEBUG, ">&STDERR" or die $!;
 our $pdo = 'http://packages.debian.org/';
 #our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
-our $package = 'userv';
+our $package = '2vcard';
 
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
@@ -21,9 +21,11 @@ our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 sub mainbranch () { return "$suite"; }
 sub uploadingbranch () { return "uploading/$suite"; }
 
+our $ua;
+
 sub url_get {
     if (!$ua) {
-	$ua = LWP::UserAgent->new;
+	$ua = LWP::UserAgent->new();
 	$ua->env_proxy;
     }
 print DEBUG "fetching @_...\n";
@@ -50,10 +52,12 @@ print DEBUG Dumper($pdodata, $&, $dscurl);
 print DEBUG Dumper($dscdata, $dscfh);
     my $dscp = Dpkg::Control::Hash->new(allow_pgp=>1);
     $dscp->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
-    mu $dscf = $dscp->{'fields'};
-    die "unsupported format $dscf->{Format}, sorry\n"
-	unless $dscf->{Format} eq '1.0';
-    return $dsc;
+#    my $dscf = $dscp->{'fields'};
+my $dscf=$dscp;
+print DEBUG Dumper($dscp,$dscf);
+    my $fmt = $dscf->{Format};
+    die "unsupported format $fmt, sorry\n" unless $fmt eq '1.0';
+    return $dscf;
 }
 
 sub check_for_git () {
@@ -76,18 +80,26 @@ sub runcmd {
 
 our ($dsc,$dsc_hash);
 
-sub combine () {
-    if (defined $dsc_hash) {
+#sub combine () {
+#    if (!defined $dsc_hash) {
+#	runcmd qw(mkdir -p .git/dgit/unpack);
+#	chdir '.git/dgit/unpack' or die $!;
 	
+	
+#	with_tmpdir($td,{
+	    
+#    });
 
-	open P, "-|", qw(git rev-parse --), $dsc_hash;
+#    }
+
+#	open P, "-|", qw(git rev-parse --), $dsc_hash;
 	
-}
+#}
 
 sub clone () {
     $dsc = get_archive_dsc();
-    $dsc_hash = $dsc->{Vcs-git-master};
-    if (defined $dsh_hash) {
+    $dsc_hash = $dsc->{'Vcs-git-master'};
+    if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
 	$dsc_hash = $&;
     }
@@ -114,9 +126,6 @@ sub clone () {
 sub fetch () {
     my ($archive_or_mirror, $suite, $package) = @_;
     my $dsc = get_archive_dsc();
+}
     
-    with_tmpdir($td,{
-	
-    });
-
 print Dumper(get_archive_dsc());
