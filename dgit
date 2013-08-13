@@ -13,7 +13,7 @@ open DEBUG, ">&STDERR" or die $!;
 our $pdo = 'http://packages.debian.org/';
 #our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
-our $package = '2vcard';
+our $package;
 
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
@@ -221,26 +221,6 @@ sub fetch_from_archive () {
     }
 }
 
-#sub combine () {
-#    if (
-	
-#	runcmd qw(git write-tree
-	
-	
-	runcmd qw(mkdir -p '');
-#	chdir '.git/dgit/unpack' or die $!;
-	
-	
-#	with_tmpdir($td,{
-	    
-#    });
-
-#    }
-
-#	open P, "-|", qw(git rev-parse --), $dsc_hash;
-	
-#}
-
 sub clone () {
     get_archive_dsc();
     $dsc_hash = $dsc->{'Vcs-git-master'};
@@ -280,6 +260,25 @@ sub clone () {
 sub fetch () {
     
 }
-    
-#print Dumper(get_archive_dsc());
-clone();
+
+sub cmd_clone {
+    if (@ARGV==1) {
+	($package) = @ARGV;
+    } elsif (@ARGV==2) {
+	($package,$suite) = @ARGV;
+    } else {
+	die;
+    }
+    clone();
+}
+
+sub parseopts () {
+    die if @ARGV && $ARGV[0] =~ m/^\-/;
+}
+
+parseopts();
+die unless @ARGV;
+my $cmd = shift @ARGV;
+parseopts();
+
+{ no strict qw(refs); &{"cmd_$cmd"}(); }
