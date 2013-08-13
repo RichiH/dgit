@@ -17,8 +17,10 @@ our $package = '2vcard';
 
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
-our $alioth_git = 'git+ssh://$aliothname/$aliothpath';
+our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
+
+our (@dget_opts) = qw(-u);
 
 our $remotename = 'dgit';
 
@@ -32,13 +34,19 @@ sub url_get {
 	$ua = LWP::UserAgent->new();
 	$ua->env_proxy;
     }
-print DEBUG "fetching @_...\n";
+    print DEBUG "fetching @_...\n";
     my $r = $ua->get(@_) or die $!;
     die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
     return $r->decoded_content();
 }
 
-our ($dscdata,$dscurl);
+our ($dscdata,$dscurl,$dsc);
+
+sub parsecontrol {
+    my $c = Dpkg::Control::Hash->new();
+    $c->load(@_) or return undef;
+    return $c;
+}
 
 sub get_archive_dsc () {
     my $pdourl = "$pdo/source/$suite/$package";
@@ -52,48 +60,59 @@ sub get_archive_dsc () {
     }msx
         or die "screenscraping of $pdourl failed :-(\n";
     $dscurl = $1;
-print DEBUG Dumper($pdodata, $&, $dscurl);
+#print DEBUG Dumper($pdodata, $&, $dscurl);
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
-print DEBUG Dumper($dscdata, $dscfh);
-    my $dscp = Dpkg::Control::Hash->new(allow_pgp=>1);
-    $dscp->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
-#    my $dscf = $dscp->{'fields'};
-my $dscf=$dscp;
-print DEBUG Dumper($dscp,$dscf);
-    my $fmt = $dscf->{Format};
+#print DEBUG Dumper($dscdata, $dscfh);
+    $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
+    $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
+#print DEBUG Dumper($dsc);
+    my $fmt = $dsc->{Format};
     die "unsupported format $fmt, sorry\n" unless $fmt eq '1.0';
-    return $dscf;
 }
 
 sub check_for_git () {
     # returns 0 or 1
-    open P, "ssh $alioth_sshtestbodge->[0] '".
-	"set -e; cd /git/dgit-test;".
-	"if test -d $package.git; then echo 1; else echo 0; fi".
-	"' |"
-	or die $!;
+    my $cmd= 
+	"ssh $alioth_sshtestbodge->[0] '".
+	" set -e; cd /git/dgit-test;".
+	" if test -d $package.git; then echo 1; else echo 0; fi".
+	"'";
+    #print DEBUG "$cmd\n";
+    open P, "$cmd |" or die $!;
     $!=0; $?=0;
     my $r = <P>; close P;
+#print STDERR ">$r<\n";
     die "$r $! $?" unless $r =~ m/^[01]$/;
-    return !!$r;
+    return $r+0;
 }
 
 sub runcmd {
     $!=0; $?=0;
-    die "$! $?" if system @_;
+    die "@_ $! $?" if system @_;
 }
 
-our ($dsc,$dsc_hash,$lastupl_hash);
+sub cmdoutput {
+    open P, "-|", @_ or die $!;
+    my $d;
+    $!=0; $?=0;
+    { local $/ = undef; $d = <P>; }
+    die if P->error;
+    close P or die "@_ $? $!";
+    chomp $d;
+    return $d;
+}
+
+our ($dsc_hash,$lastupl_hash);
 
 sub generate_commit_from_dsc () {
     my $ud = '.git/dgit/unpack';
-    remove_tree($ud);
+    rmtree($ud);
     mkpath '.git/dgit';
     mkdir $ud or die $!;
     chdir $ud or die $!;
     my @files;
-    foreach (split /\n/, ($dsch->{Checksums-Sha256} || $dsch->{Files})) {
+    foreach (split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files})) {
 	next unless m/\S/;
 	m/^\w+ \d+ (\S+)$/ or die "$_ ?";
 	my $f = $1;
@@ -103,7 +122,7 @@ sub generate_commit_from_dsc () {
 	    or $!==&ENOENT
 	    or die "$f $!";
     }
-    runcmd qw(dget --), $dscurl;
+    runcmd qw(dget), @dget_opts, qw(--), $dscurl;
     foreach my $f (grep { m/\.tar\.gz$/ } @files) {
 	link $f, "../../../$f"
 	    or $!==&EEXIST
@@ -116,15 +135,14 @@ sub generate_commit_from_dsc () {
     chdir $dir or die "$dir $!";
     die if stat '.git';
     die $! unless $!==&ENOENT;
-    runcmd qw(git init);
-    remove_tree(.git/objects);
-    symlink '../../objects','.git/objects' or die $!;
+    runcmd qw(git init -q);
+    rmtree('.git/objects');
+    symlink '../../../../objects','.git/objects' or die $!;
     runcmd qw(git add -Af);
     my $tree = cmdoutput qw(git write-tree);
-    chomp $tree or die;
+    chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
     runcmd qw(sh -ec), 'dpkg-parsechangelog >../changelog.tmp';
-    my $clogp = Dpkg::Control::Hash->new();
-    $clogp->parse('../changelog.tmp','changelog') or die;
+    my $clogp = parsecontrol('../changelog.tmp','changelog') or die;
     my $date = cmdoutput qw(date), '+%s %z', qw(-d),$clogp->{Date};
     my $author = $clogp->{Maintainer};
     $author =~ s#,.*##ms;
@@ -138,24 +156,26 @@ author $authline
 committer $authline
 
 $clogp->{Changes}
+
 # imported by dgit from the archive
 END
     close C or die $!;
     print "synthesised git commit from .dsc $clogp->{Version}\n";
-    my $commithash = runcmd qw(git hash-object -w -t commit ../commit.tmp);
-    chdir '../../..' or die $!;
+    my $commithash = cmdoutput qw(git hash-object -w -t commit ../commit.tmp);
+    chdir '../../../..' or die $!;
     cmdoutput qw(git update-ref -m),"dgit synthesise $clogp->{Version}",
-              'DGIT_ARCHIVE', $hash;
+              'DGIT_ARCHIVE', $commithash;
     cmdoutput qw(git log -n2), $commithash;
     # ... gives git a chance to complain if our commit is malformed
     my $outputhash = $commithash;
     if (defined $lastupl_hash) {
-	chdir $ud or die $!;
+	chdir "$ud/$dir" or die $!;
 	runcmd qw(git reset --hard), $lastupl_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
 	my $oldclogp = Dpkg::Control::Hash->new();
 	$oldclogp->parse('../changelogold.tmp','previous changelog') or die;
-	$vcmp = version_compare_string($oldclogp->{Version}, $clogp->{Version});
+	my $vcmp =
+	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
 	if ($vcmp < 0) {
 	    # git upload/ is earlier vsn than archive, use archive
 	} elsif ($vcmp >= 0) {
@@ -169,9 +189,9 @@ END
 		" to-be-uploaded (upload/) branch but archive".
 		" version hash no commit hash?!\n";
         }
-	chdir '../../..' or die $!;
+	chdir '../../../..' or die $!;
     }
-    remove_tree($ud);
+    rmtree($ud);
     return $outputhash;
 }
 
@@ -192,7 +212,7 @@ sub fetch_from_archive () {
     }
     if ($lastupl_hash) {
 	my $mb = cmdoutput qw(git merge-base), $dsc_hash, $lastupl_hash;
-	die "not fast forward on last upload branch!"
+	die "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
 	    unless $mb eq $lastupl_hash;
     }
@@ -222,7 +242,7 @@ sub fetch_from_archive () {
 #}
 
 sub clone () {
-    $dsc = get_archive_dsc();
+    get_archive_dsc();
     $dsc_hash = $dsc->{'Vcs-git-master'};
     if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
@@ -237,7 +257,6 @@ sub clone () {
 	runcmd qw(git clone --origin),$remotename, qw(-b), $suite, '--',
 	    $alioth_git, $dstdir;
 	chdir "$dstdir" or die "$dstdir $!";
-	record_suite_origin();
 	fetch_from_archive();
 	runcmd qw(git reset --hard), $lastupl_ref;
     } else {
@@ -245,21 +264,22 @@ sub clone () {
 	print "starting new git history\n";
 	mkdir $dstdir or die "$dstdir $!";
 	chdir "$dstdir" or die "$dstdir $!";
-	runcmd qw(git init);
-	open H, "> .git/refs/HEAD" or die $!;
+	runcmd qw(git init -q);
+	open H, "> .git/HEAD" or die $!;
 	print H "ref: refs/heads/$suite\n" or die $!;
 	close H or die $!;
 	runcmd qw(git remote add), $remotename, $alioth_git;
-	record_suite_origin();
 	runcmd "git config branch.$suite.remote $remotename";
 	runcmd "git config branch.$suite.merge refs/heads/$suite";
 	my $newhash = generate_commit_from_dsc();
-	runcmd "git reset --hard", $newhash;
+	runcmd qw(git reset --hard), $newhash;
     }
+    print "ready for work in $dstdir\n";
 }
 
 sub fetch () {
     
 }
     
-print Dumper(get_archive_dsc());
+#print Dumper(get_archive_dsc());
+clone();
