@@ -294,6 +294,9 @@ sub push () {
     my $tree = mktree_in_ud_from_only_subdir();
     chdir '../../../..' or die $!;
     runcmd qw(git diff --exit-code), $tree;
+    runcmd qw(git fetch), $alioth_git,
+        map { "$_:refs/remotes/$remotename/$_" }
+        (mainbranch(), uploadbranch());
     
     die <<END;
 fetch from alioth
