@@ -306,8 +306,11 @@ sub push () {
     runcmd qw(git fetch), $alioth_git,
         map { "$_:refs/remotes/$remotename/$_" }
         (mainbranch(), uploadbranch());
-    
     die <<END;
+    if (!is_fast_fwd(mainbranch
+xxx introduce remote_lref
+xxx use remote_lref everywhere
+
 fetch from alioth
 do fast forward check and maybe fake merge
 push to uploading
