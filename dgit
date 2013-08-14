@@ -63,6 +63,14 @@ sub parsecontrol {
     return $c;
 }
 
+sub parsechangelog {
+    my $c = Dpkg::Control::Hash->new();
+    my $p = new IO::File '-|', qw(dpkg-parsechangelog) or die $!;
+    $c->parse($p);
+    $?=0; $!=0; close $p or die "$! $?";
+    return $c;
+}
+
 sub get_archive_dsc () {
     my $rmad = cmdoutput qw(rmadison -asource),"-s$suite",$package;
     $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
@@ -105,11 +113,34 @@ sub check_for_git () {
 
 our ($dsc_hash,$lastupl_hash);
 
-sub generate_commit_from_dsc () {
-    my $ud = '.git/dgit/unpack';
+our $ud = '.git/dgit/unpack';
+
+sub prep_ud () {
     rmtree($ud);
     mkpath '.git/dgit';
     mkdir $ud or die $!;
+}
+
+sub mktree_in_ud_from_only_subdir () {
+    # changes into the subdir
+    my (@dirs) = <*/.>;
+    die unless @dirs==1;
+    $dirs[0] =~ m#^([^/]+)/\.$# or die;
+    my $dir = $1;
+    chdir $dir or die "$dir $!";
+    die if stat '.git';
+    die $! unless $!==&ENOENT;
+    runcmd qw(git init -q);
+    rmtree('.git/objects');
+    symlink '../../../../objects','.git/objects' or die $!;
+    runcmd qw(git add -Af);
+    my $tree = cmdoutput qw(git write-tree);
+    chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
+    return ($tree,$dir);
+}
+
+sub generate_commit_from_dsc () {
+    prep_ud();
     chdir $ud or die $!;
     my @files;
     foreach (split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files})) {
@@ -128,19 +159,7 @@ sub generate_commit_from_dsc () {
 	    or $!==&EEXIST
 	    or die "$f $!";
     }
-    my (@dirs) = <*/.>;
-    die unless @dirs==1;
-    $dirs[0] =~ m#^([^/]+)/\.$# or die;
-    my $dir = $1;
-    chdir $dir or die "$dir $!";
-    die if stat '.git';
-    die $! unless $!==&ENOENT;
-    runcmd qw(git init -q);
-    rmtree('.git/objects');
-    symlink '../../../../objects','.git/objects' or die $!;
-    runcmd qw(git add -Af);
-    my $tree = cmdoutput qw(git write-tree);
-    chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
+    my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     runcmd qw(sh -ec), 'dpkg-parsechangelog >../changelog.tmp';
     my $clogp = parsecontrol('../changelog.tmp','changelog') or die;
     my $date = cmdoutput qw(date), '+%s %z', qw(-d),$clogp->{Date};
@@ -259,6 +278,30 @@ sub clone () {
 
 sub fetch () {
     
+}
+
+sub push () {
+    runcmd qw(git diff --quiet HEAD);
+    my $clogp = parsechangelog();
+    $package = $clogp->{Source};
+    my $dscfn = "${package}_$clogp->{Version}.dsc";
+    stat $dscfn or die "$dscfn $!";
+    $dsc = parsecontrol("../$dscfn");
+    prep_ud();
+    chdir $ud or die $!;
+    print "checking that $dscfn corresponds to HEAD\n";
+    runcmd qw(dpkg-source -x --), "../../../../$dscfn";
+    my $tree = mktree_in_ud_from_only_subdir();
+    chdir '../../../..' or die $!;
+    runcmd qw(git diff --exit-code), $tree;
+    
+    die <<END;
+fetch from alioth
+do fast forward check and maybe fake merge
+push to uploading
+dput
+push to main
+END
 }
 
 sub cmd_clone {

@@ -1,5 +1,7 @@
 Download orig.tar.gz even if archive has hash
 
+Fix branch names to contain dgit
+
 Cope with outside-main things (rmadison does not print pool path)
 
 Cope with non-Debian archives
