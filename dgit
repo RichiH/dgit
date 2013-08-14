@@ -216,10 +216,14 @@ END
 
 my $lastupl_ref = "refs/remotes/$remotename/upload/$suite";
 
-sub is_fast_ff ($$) {
+sub rev_parse ($) {
+    return cmdoutput qw(git rev-parse --), "$_[0]~0";
+}
+
+sub is_fast_fwd ($$) {
     my ($ancestor,$child) = @_;
     my $mb = cmdoutput qw(git merge-base), $dsc_hash, $lastupl_hash;
-    return $mb eq $ancestor;
+    return rev_parse($mb) eq rev_parse($ancestor);
 }
 
 sub fetch_from_archive () {
@@ -238,7 +242,7 @@ sub fetch_from_archive () {
     if ($lastupl_hash) {
 	die "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
-	    unless is_fast_ff($lastupl_hash, $dsc_hash);
+	    unless is_fast_fwd($lastupl_hash, $dsc_hash);
     }
     if ($lastupl_ref ne $hash) {
 	cmdoutput qw(git update-ref -m), 'dgit fetch', $lastupl_ref, $hash;
