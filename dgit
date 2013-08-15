@@ -47,12 +47,12 @@ our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
 our $keyid;
 
-our %opts_opt_map = ('dg' => \@dget,
-		     'dp' => \@dput,
-		     'ds' => \@debsign);
+our %opts_opt_map = ('dget' => \@dget,
+		     'dput' => \@dput,
+		     'debsign' => \@debsign);
 
 our $remotename = 'dgit';
-our $ourdscfield = 'Vcs-git-master';
+our $ourdscfield = 'Vcs-Git-Master';
 our $branchprefix = 'dgit';
 
 sub uploadbranch () { return "$branchprefix/$suite"; }
@@ -305,7 +305,7 @@ sub ensure_we_have_orig () {
 }
 
 sub rev_parse ($) {
-    return cmdoutput @git, qw(rev-parse --), "$_[0]~0";
+    return cmdoutput @git, qw(rev-parse), "$_[0]~0";
 }
 
 sub is_fast_fwd ($$) {
@@ -323,6 +323,7 @@ sub fetch_from_archive () {
     die $! if $!;
     die $? unless ($?==0 && chomp $upload_hash) 
 	or ($?==256 && !length $upload_hash);
+    $upload_hash ||= '';
     my $hash;
     if (defined $dsc_hash) {
 	die "missing git history even though dsc has hash"
@@ -424,22 +425,22 @@ sub dopush () {
     rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
     if (!$changesfile) {
 	my $pat = "../${package}_$clogp->{Version}_*.changes";
-	my @cs = <$pat>;
+	my @cs = glob $pat;
         die "$pat ?" unless @cs==1;
-	($changesfile) = $cs;
+	($changesfile) = @cs;
     }
     if ($sign) {
-	my @tag_cmd = @git, qw(tag -s -m),
-	    "Release $dsc->{Version} for $suite [dgit]";
+	my @tag_cmd = (@git, qw(tag -s -m),
+		       "Release $dsc->{Version} for $suite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;
 	runcmd_ordryrun @tag_cmd;
 	my @debsign_cmd = @debsign;
 	push @debsign_cmd, "-k$keyid" if defined $keyid;
-	push @debsign_cmd, "../$changesfile";
-	runcmd_ordryrun qw(debsign);
+	push @debsign_cmd, $changesfile;
+	runcmd_ordryrun @debsign_cmd;
     }
     runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
-    runcmd_ordryrun @dput, "../$dscfn";
+    runcmd_ordryrun @dput, $changesfile;
 }
 
 sub cmd_clone {
@@ -454,7 +455,7 @@ sub cmd_clone {
 }
 
 sub branchsuite () {
-    my $branch = cmdoutput_errok @git, qw(symbolic-ref);
+    my $branch = cmdoutput_errok @git, qw(symbolic-ref HEAD);
     chomp $branch;
     if ($branch =~ m#^refs/heads/$branchprefix/([^/.]+)$#o) {
 	return $1;
@@ -501,22 +502,27 @@ sub cmd_push {
 sub cmd_build {
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
-    runcmd_dryrun
+    runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
-        "--git-debian-branch=".uploadbranch(),
-        @ARGV;
+            "--git-debian-branch=".uploadbranch(),
+            @ARGV;
 }
 
 sub parseopts () {
+    my $om;
     while (@ARGV) {
-	last unless $ARGV[0];
+	last unless $ARGV[0] =~ m/^-/;
 	$_ = shift @ARGV;
 	last if m/^--?$/;
 	if (m/^--/) {
-	    if (m/^--dry-run/) {
+	    if (m/^--dry-run$/) {
 		$dryrun=1;
-	    if (m/^--no-sign/) {
+	    } elsif (m/^--no-sign$/) {
 		$sign=0;
+	    } elsif (m/^--(\w+)=(.*)/s && ($om = $opts_opt_map{$1})) {
+		$om->[0] = $2;
+	    } elsif (m/^--(\w+):(.*)/s && ($om = $opts_opt_map{$1})) {
+		push @$om, $2;
 	    } else {
 		die "$_ ?";
 	    }
@@ -524,22 +530,12 @@ sub parseopts () {
 	    while (m/^-./s) {
 		if (s/^-n/-/) {
 		    $dryrun=1;
-		} elsif (s/^-p(.*)//s) {
-		    $gpg[0] = $1;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, $1;
 		} elsif (s/^-C(.*)//s) {
 		    $changesfile = $1;
 		} elsif (s/^-k(.*)//s) {
 		    $keyid=$1;
-		} elsif (s/^-:(\w+)(.*)//s) {
-		    my $om = $opts_opt_map{$1};
-		    die "$1" unless defined $om;
-		    $om->[0] = $1;
-		} elsif (s/^-,(\w+)(.*)//s) {
-		    my $om = $opts_opt_map{$1};
-		    die "$1" unless defined $om;
-		    push @$om, $1;
 		} else {
 		    die "$_ ?";
 		}
