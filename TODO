@@ -13,3 +13,5 @@ and paths in archive for dscs (b) unpriv pull location (c) priv
 push location
 
 Support Format 3.0 (quilt)
+
+Push access for DMs.
