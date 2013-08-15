@@ -38,13 +38,15 @@ our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
 our (@dget_opts) = qw(-u);
+our (@git_tag_opts);
 
 our $remotename = 'dgit';
+our $ourdscfield = 'Vcs-git-master';
 
-sub mainbranch () { return "dgit/$suite"; }
-sub uploadbranch () { return "dgit/$suite.upload"; }
+sub uploadbranch () { return "dgit/$suite"; }
 sub lref ($) { return "refs/heads/$_[0]"; }
 sub rref ($) { return "refs/remotes/$remotename/$_[0]"; }
+sub debiantag ($) { return "debian/$_[0]"; }
 
 our $ua;
 
@@ -272,7 +274,7 @@ sub fetch_from_archive () {
 
 sub clone () {
     get_archive_dsc();
-    $dsc_hash = $dsc->{'Vcs-git-master'};
+    $dsc_hash = $dsc->{$ourdscfield};
     if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
 	$dsc_hash = $&;
@@ -294,11 +296,11 @@ sub clone () {
 	chdir "$dstdir" or die "$dstdir $!";
 	runcmd qw(git init -q);
 	open H, "> .git/HEAD" or die $!;
-	print H "ref: ".lref(mainbranch())."\n" or die $!;
+	print H "ref: ".lref(uploadbranch())."\n" or die $!;
 	close H or die $!;
 	runcmd qw(git remote add), $remotename, $alioth_git;
 	runcmd "git config branch.$suite.remote $remotename";
-	runcmd "git config branch.$suite.merge ".lref(mainbranch());
+	runcmd "git config branch.$suite.merge ".lref(uploadbranch());
 	my $newhash = generate_commit_from_dsc();
 	runcmd qw(git reset --hard), $newhash;
     }
@@ -315,10 +317,10 @@ sub fetch () {
 
 sub pull () {
     fetch();
-    runcmd qw(git merge),lref(uploadbranch());
+    runcmd qw(git merge -m),"Merge from $suite [dgit]",lref(uploadbranch());
 }
 
-sub push () {
+sub dopush () {
     runcmd qw(git diff --quiet HEAD);
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
@@ -332,20 +334,26 @@ sub push () {
     my $tree = mktree_in_ud_from_only_subdir();
     chdir '../../../..' or die $!;
     runcmd qw(git diff --exit-code), $tree;
-    runcmd qw(git fetch), $alioth_git,
-        map { lref($_).":".rref($_) }
-        (mainbranch(), uploadbranch());
-    die <<END;
-    if (!is_fast_fwd(mainbranch
-xxx introduce remote_lref
-xxx use remote_lref everywhere
-
-fetch from alioth
-do fast forward check and maybe fake merge
-push to uploading
-dput
-push to main
-END
+#fetch from alioth
+#do fast forward check and maybe fake merge
+#    if (!is_fast_fwd(mainbranch
+#    runcmd qw(git fetch -p ), $alioth_git,
+#        map { lref($_).":".rref($_) }
+#        (uploadbranch());
+    $dsc->{$ourdscfield} = rev_parse('HEAD');
+    $dsc->save("../$dscfn.tmp") or die $!;
+    rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
+    if ($sign) {
+	runcmd qw(git tag -s),@git_tag_opts,qw(-m),
+	    "Release $dsc->{Version} for $suite [dgit]";
+	unlink "../$dscfn.asc" or $!==&ENOENT or die "$dscfn.asc $!";
+	runcmd qw(gpg --clearsign),@gpg_opts,"../$dscfn";
+	rename "../$dscfn.asc","../$dscfn" or die "$dscfn $!";
+    }
+    if (!$nopush) {
+	runcmd qw(git push),$remotename,"HEAD:".lref(uploadbranch());
+	runcmd qw(dput),"../$dscfn";
+    }
 }
 
 sub cmd_clone {
@@ -357,6 +365,41 @@ sub cmd_clone {
 	die;
     }
     clone();
+}
+
+sub branchsuite () {
+    $branch = `git-symbolic-ref HEAD`;
+    if ($branch =~ m#^refs/heads/dgit/([^/.]+)$#) {
+	return $1;
+    } else {
+	return undef;
+    }
+}
+
+sub cmd_fetch {
+    my $clogp = parsechangelog();
+    $package = $clogp->{Source};
+    if (@ARGV==0) {
+	$suite = branchsuite();
+	$suite ||= $clogp->{Distribution};
+	print "fetching from suite $suite\n";
+    } elsif (@ARGV==1) {
+	($suite) = @ARGV;
+    } else {
+	die;
+    }
+    fetch();
+}
+
+sub cmd_push {
+    my $clogp = parsechangelog();
+    $package = $clogp->{Source};
+    if (@ARGV==0) {
+	$suite = $clogp->{Distribution};
+    } else {
+	die;
+    }
+    dopush();
 }
 
 sub parseopts () {
