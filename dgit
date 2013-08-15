@@ -34,6 +34,7 @@ our $package;
 
 our $sign = 1;
 our $dryrun = 0;
+our $changesfile;
 
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
@@ -41,13 +42,14 @@ our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
 our (@git) = qw(git);
-our (@dget_opts);
-our (@git_tag_opts);
-our (@gpg) = qw(gpg);
+our (@dget) = qw(dget);
+our (@dput) = qw(dput);
+our (@debsign) = qw(debsign);
+our $keyid;
 
-our %opts_opt_map = ('d' => \@dget_opts,
-		     't' => \@git_tag_opts,
-		     'g' => \@gpg);
+our %opts_opt_map = ('dg' => \@dget,
+		     'dp' => \@dput,
+		     'ds' => \@debsign);
 
 our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-git-master';
@@ -223,7 +225,7 @@ sub generate_commit_from_dsc () {
 	    or $!==&ENOENT
 	    or die "$f $!";
     }
-    runcmd qw(dget), @dget_opts, qw(--), $dscurl;
+    runcmd @dget, qw(--), $dscurl;
     foreach my $f (grep { is_orig_file($_) } @files) {
 	link $f, "../../../../$f"
 	    or $!==&EEXIST
@@ -297,7 +299,8 @@ sub ensure_we_have_orig () {
 	$origurl .= "/$f";
 	die "$f ?" unless $f =~ m/^${package}_/;
 	die "$f ?" if $f =~ m#/#;
-	runcmd_ordryrun qw(sh -ec),'cd ..; exec dget -- "$1"','x',$origurl;
+	runcmd_ordryrun qw(sh -ec),'cd ..; exec "$@"','x',
+	    @dget,'--',$origurl;
     }
 }
 
@@ -419,21 +422,24 @@ sub dopush () {
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
-fixme need to sign changes
+    if (!$changesfile) {
+	my $pat = "../${package}_$clogp->{Version}_*.changes";
+	my @cs = <$pat>;
+        die "$pat ?" unless @cs==1;
+	($changesfile) = $cs;
+    }
     if ($sign) {
-	runcmd_ordryrun @git, qw(tag -s),@git_tag_opts,qw(-m),
+	my @tag_cmd = @git, qw(tag -s -m),
 	    "Release $dsc->{Version} for $suite [dgit]";
-	my @sig_cmd = (@gpg, qw(--clearsign), "../$dscfn");
-	if (!$dryrun) {
-	    unlink "../$dscfn.asc" or $!==&ENOENT or die "$dscfn.asc $!";
-	    runcmd @sig_cmd;
-	    rename "../$dscfn.asc","../$dscfn" or die "$dscfn $!";
-	} else {
-	    dryrun_report @sig_cmd;
-	}
+	push @tag_cmd, qw(-u),$keyid if defined $keyid;
+	runcmd_ordryrun @tag_cmd;
+	my @debsign_cmd = @debsign;
+	push @debsign_cmd, "-k$keyid" if defined $keyid;
+	push @debsign_cmd, "../$changesfile";
+	runcmd_ordryrun qw(debsign);
     }
     runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
-    runcmd_ordryrun qw(dput),"../$dscfn";
+    runcmd_ordryrun @dput, "../$dscfn";
 }
 
 sub cmd_clone {
@@ -492,6 +498,15 @@ sub cmd_push {
     dopush();
 }
 
+sub cmd_build {
+    my $clogp = parsechangelog();
+    $suite = $clogp->{Distribution};
+    runcmd_dryrun
+	qw(git-buildpackage -us -uc --git-no-sign-tags),
+        "--git-debian-branch=".uploadbranch(),
+        @ARGV;
+}
+
 sub parseopts () {
     while (@ARGV) {
 	last unless $ARGV[0];
@@ -513,11 +528,18 @@ sub parseopts () {
 		    $gpg[0] = $1;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, $1;
+		} elsif (s/^-C(.*)//s) {
+		    $changesfile = $1;
 		} elsif (s/^-k(.*)//s) {
-		    push @git_tag_opts, '-u', $1;
-		    push @gpg, '-u', $1;
-		} elsif (s/^-:([dtg])(.*)//s) {
-		    push @{ $opts_opt_map{$1} }, $_;
+		    $keyid=$1;
+		} elsif (s/^-:(\w+)(.*)//s) {
+		    my $om = $opts_opt_map{$1};
+		    die "$1" unless defined $om;
+		    $om->[0] = $1;
+		} elsif (s/^-,(\w+)(.*)//s) {
+		    my $om = $opts_opt_map{$1};
+		    die "$1" unless defined $om;
+		    push @$om, $1;
 		} else {
 		    die "$_ ?";
 		}
