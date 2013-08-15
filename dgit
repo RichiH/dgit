@@ -37,7 +37,7 @@ our $dryrun = 0;
 our $changesfile;
 
 our $aliothname = 'iwj@git.debian.org';
-our $aliothpath = '/git/dgit-test';
+our $aliothpath = '/git/dgit-repos';
 our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
