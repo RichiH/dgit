@@ -177,7 +177,7 @@ sub check_for_git () {
     # returns 0 or 1
     my $cmd= 
 	"ssh $alioth_sshtestbodge->[0] '".
-	" set -e; cd $aliothpath;".
+	" set -e; cd $alioth_sshtestbodge->[1];".
 	" if test -d $package.git; then echo 1; else echo 0; fi".
 	"'";
     #print DEBUG "$cmd\n";
@@ -445,6 +445,13 @@ sub dopush () {
 	($changesfile) = @cs;
     }
     my $tag = debiantag($dsc->{Version});
+    if (!check_for_git()) {
+	runcmd_ordryrun qw(ssh),$alioth_sshtestbodge->[0],
+	"set -e; cd $alioth_sshtestbodge->[1];".
+	    " mkdir -p $package.git;".
+	    " cd $package.git;".
+	    " if ! test -d objects; then git init --bare; fi";
+    }
     runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
