@@ -134,17 +134,32 @@ sub parsechangelog {
     return $c;
 }
 
-sub get_archive_dsc () {
-    my $rmad = cmdoutput qw(rmadison -asource),"-s$suite",$package;
+our $rmad;
+
+sub askmadison () {
+    $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite",$package;
     $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* /x or die "$rmad $?";
     $1 eq $package or die "$rmad $package ?";
     my $vsn = $2;
-    $3 eq $suite or die "$rmad $suite ?";
+    if ($suite ne $3) {
+	# madison canonicalises for us
+	print "canonical suite name for $suite is $3\n";
+	$suite = $3;
+    }
     $4 eq 'source' or die "$rmad ?";
-    # fixme it does not show us the component ?
+    return $vsn;
+}
+
+sub canonicalise_suite () {
+    askmadison();
+}
+
+sub get_archive_dsc () {
+    my $vsn = askmadison();
+    # fixme madison does not show us the component
     my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
     $dscurl = "$mirror/pool/main/$prefix/$package/${package}_$vsn.dsc";
 #print DEBUG Dumper($pdodata, $&, $dscurl);
@@ -429,17 +444,20 @@ sub dopush () {
         die "$pat ?" unless @cs==1;
 	($changesfile) = @cs;
     }
+    my $tag = debiantag($dsc->{Version});
+    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
 		       "Release $dsc->{Version} for $suite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;
+	push @tag_cmd, $tag;
 	runcmd_ordryrun @tag_cmd;
 	my @debsign_cmd = @debsign;
 	push @debsign_cmd, "-k$keyid" if defined $keyid;
 	push @debsign_cmd, $changesfile;
 	runcmd_ordryrun @debsign_cmd;
     }
-    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
+    runcmd_ordryrun @git, qw(push),$remotename,"refs/tags/$tag";
     runcmd_ordryrun @dput, $changesfile;
 }
 
@@ -470,9 +488,11 @@ sub fetchpullargs () {
     if (@ARGV==0) {
 	$suite = branchsuite();
 	$suite ||= $clogp->{Distribution};
+	canonicalise_suite();
 	print "fetching from suite $suite\n";
     } elsif (@ARGV==1) {
 	($suite) = @ARGV;
+	canonicalise_suite();
     } else {
 	die;
     }
@@ -493,6 +513,7 @@ sub cmd_push {
     $package = $clogp->{Source};
     if (@ARGV==0) {
 	$suite = $clogp->{Distribution};
+	canonicalise_suite();
     } else {
 	die;
     }
@@ -502,6 +523,8 @@ sub cmd_push {
 sub cmd_build {
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
+    $package = $clogp->{Source};
+    canonicalise_suite();
     runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
             "--git-debian-branch=".uploadbranch(),
