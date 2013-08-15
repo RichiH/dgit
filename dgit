@@ -41,8 +41,10 @@ our (@dget_opts) = qw(-u);
 
 our $remotename = 'dgit';
 
-sub mainbranch () { return "$suite"; }
-sub uploadbranch () { return "upload/$suite"; }
+sub mainbranch () { return "dgit/$suite"; }
+sub uploadbranch () { return "dgit/$suite.upload"; }
+sub lref ($) { return "refs/heads/$_[0]"; }
+sub rref ($) { return "refs/remotes/$remotename/$_[0]"; }
 
 our $ua;
 
@@ -232,8 +234,6 @@ END
     return $outputhash;
 }
 
-my $lastupl_ref = "refs/remotes/$remotename/upload/$suite";
-
 sub rev_parse ($) {
     return cmdoutput qw(git rev-parse --), "$_[0]~0";
 }
@@ -245,8 +245,9 @@ sub is_fast_fwd ($$) {
 }
 
 sub fetch_from_archive () {
-    # ensures that $lastupl_ref is what is actually in the archive,
+    # ensures that rref(uploadbranch()) is what is actually in the archive,
     #  one way or another
+    my $lastupl_ref = rref(uploadbranch());
     $!=0; $lastupl_hash = `git show-ref --heads $lastupl_ref`;
     die $! if $!;
     die $? unless ($?==0 && chomp $lastupl_hash) 
@@ -284,7 +285,7 @@ sub clone () {
 	    $alioth_git, $dstdir;
 	chdir "$dstdir" or die "$dstdir $!";
 	fetch_from_archive();
-	runcmd qw(git reset --hard), $lastupl_ref;
+	runcmd qw(git reset --hard), rref(uploadbranch());
     } else {
 	die "missing git history even though dsc has hash" if defined $dsc_hash;
 	print "starting new git history\n";
@@ -292,11 +293,11 @@ sub clone () {
 	chdir "$dstdir" or die "$dstdir $!";
 	runcmd qw(git init -q);
 	open H, "> .git/HEAD" or die $!;
-	print H "ref: refs/heads/$suite\n" or die $!;
+	print H "ref: ".lref(mainbranch())."\n" or die $!;
 	close H or die $!;
 	runcmd qw(git remote add), $remotename, $alioth_git;
 	runcmd "git config branch.$suite.remote $remotename";
-	runcmd "git config branch.$suite.merge refs/heads/$suite";
+	runcmd "git config branch.$suite.merge ".lref(mainbranch());
 	my $newhash = generate_commit_from_dsc();
 	runcmd qw(git reset --hard), $newhash;
     }
@@ -322,7 +323,7 @@ sub push () {
     chdir '../../../..' or die $!;
     runcmd qw(git diff --exit-code), $tree;
     runcmd qw(git fetch), $alioth_git,
-        map { "$_:refs/remotes/$remotename/$_" }
+        map { lref($_).":".rref($_) }
         (mainbranch(), uploadbranch());
     die <<END;
     if (!is_fast_fwd(mainbranch
