@@ -4,6 +4,8 @@ Cope with non-Debian archives
 
 Make it possible to do dgit clone / fetch anonymously
 
+Suite name canonicalisation/mapping
+
 Archive agility.  Archive needs to specify (a) way to get versions
 and paths in archive for dscs (b) unpriv pull location (c) priv
 push location
