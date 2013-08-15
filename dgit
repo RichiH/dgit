@@ -32,6 +32,9 @@ our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
 our $package;
 
+our $sign = 1;
+our $nopush = 0;
+
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
 our $alioth_git = "git+ssh://$aliothname/$aliothpath";
@@ -39,6 +42,7 @@ our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
 our (@dget_opts) = qw(-u);
 our (@git_tag_opts);
+our (@gpg_opts);
 
 our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-git-master';
@@ -87,7 +91,8 @@ sub parsecontrol {
 
 sub parsechangelog {
     my $c = Dpkg::Control::Hash->new();
-    my $p = new IO::File '-|', qw(dpkg-parsechangelog) or die $!;
+    my $p = new IO::Handle;
+    open $p, '-|', qw(dpkg-parsechangelog) or die $!;
     $c->parse($p);
     $?=0; $!=0; close $p or die "$! $?";
     return $c;
@@ -161,14 +166,23 @@ sub mktree_in_ud_from_only_subdir () {
     return ($tree,$dir);
 }
 
+sub dsc_files () {
+    map {
+	m/^\w+ \d+ (\S+)$/ or die "$_ ?";
+	$1;
+    } grep m/\S/, split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files});
+}
+
+sub is_orig_file ($) {
+    local ($_) = @_;
+    m/\.orig\.tar\.\w+$/;
+}
+
 sub generate_commit_from_dsc () {
     prep_ud();
     chdir $ud or die $!;
     my @files;
-    foreach (split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files})) {
-	next unless m/\S/;
-	m/^\w+ \d+ (\S+)$/ or die "$_ ?";
-	my $f = $1;
+    foreach my $f (dsc_files()) {
 	die if $f =~ m#/|^\.|\.dsc$|\.tmp$#;
 	push @files, $f;
 	link "../../../$f", $f
@@ -176,7 +190,7 @@ sub generate_commit_from_dsc () {
 	    or die "$f $!";
     }
     runcmd qw(dget), @dget_opts, qw(--), $dscurl;
-    foreach my $f (grep { m/\.tar\.gz$/ } @files) {
+    foreach my $f (grep { is_orig_file($_) } @files) {
 	link $f, "../../../$f"
 	    or $!==&EEXIST
 	    or die "$f $!";
@@ -236,6 +250,23 @@ END
     return $outputhash;
 }
 
+sub ensure_we_have_orig () {
+    foreach my $f (dsc_files()) {
+	next unless is_orig_file($f);
+	if (stat "../$f") {
+	    die "$f ?" unless -f _;
+	} else {
+	    die "$f $!" unless $!==&ENOENT;
+	}
+	my $origurl = $dscurl;
+	$origurl =~ s{/[^/]+$}{};
+	$origurl .= "/$f";
+	die "$f ?" unless $f =~ m/^${package}_/;
+	die "$f ?" if $f =~ m#/#;
+	runcmd qw(sh -ec),'cd ..; exec dget -- "$1"','x',$origurl;
+    }
+}
+
 sub rev_parse ($) {
     return cmdoutput qw(git rev-parse --), "$_[0]~0";
 }
@@ -253,12 +284,13 @@ sub fetch_from_archive () {
     $!=0; $upload_hash = `git show-ref --heads $upload_ref`;
     die $! if $!;
     die $? unless ($?==0 && chomp $upload_hash) 
-	or ($?==128 && !length $upload_hash);
+	or ($?==256 && !length $upload_hash);
     my $hash;
     if (defined $dsc_hash) {
 	die "missing git history even though dsc has hash"
 	    unless length $upload_hash;
 	$hash = $dsc_hash;
+	ensure_we_have_orig();
     } else {
 	$hash = generate_commit_from_dsc();
     }
@@ -368,7 +400,7 @@ sub cmd_clone {
 }
 
 sub branchsuite () {
-    $branch = `git-symbolic-ref HEAD`;
+    my $branch = `git-symbolic-ref HEAD`;
     if ($branch =~ m#^refs/heads/dgit/([^/.]+)$#) {
 	return $1;
     } else {
