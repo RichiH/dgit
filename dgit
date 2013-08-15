@@ -33,16 +33,21 @@ our $suite = 'sid';
 our $package;
 
 our $sign = 1;
-our $nopush = 0;
+our $dryrun = 0;
 
 our $aliothname = 'iwj@git.debian.org';
 our $aliothpath = '/git/dgit-test';
 our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
-our (@dget_opts) = qw(-u);
+our (@git) = qw(git);
+our (@dget_opts);
 our (@git_tag_opts);
-our (@gpg_opts);
+our (@gpg) = qw(gpg);
+
+our %opts_opt_map = ('d' => \@dget_opts,
+		     't' => \@git_tag_opts,
+		     'g' => \@gpg);
 
 our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-git-master';
@@ -73,15 +78,43 @@ sub runcmd {
     die "@_ $! $?" if system @_;
 }
 
-sub cmdoutput {
+sub cmdoutput_errok {
     open P, "-|", @_ or die $!;
     my $d;
     $!=0; $?=0;
     { local $/ = undef; $d = <P>; }
     die if P->error;
-    close P or die "@_ $? $!";
+    close P or return undef;
     chomp $d;
     return $d;
+}
+
+sub cmdoutput {
+    my $d = cmdoutput_errok @_;
+    defined $d or die "@_ $? $!";
+    return $d;
+}
+
+sub dryrun_report {
+    print "#" or die $!;
+    local $_;
+    foreach my $a (@_) {
+	$_ = $a;
+	if (s{['\\]}{\\$&}g || m{\s} || m{[^-_./0-9a-z]}i) {
+	    print " '$_'" or die $!;
+	} else {
+	    print " $_" or die $!;
+	}
+    }
+    print "\n" or die $!;
+}
+
+sub runcmd_ordryrun {
+    if (!$dryrun) {
+	runcmd @_;
+    } else {
+	dryrun_report @_;
+    }
 }
 
 sub parsecontrol {
@@ -161,8 +194,8 @@ sub mktree_in_ud_from_only_subdir () {
     runcmd qw(git init -q);
     rmtree('.git/objects');
     symlink '../../../../objects','.git/objects' or die $!;
-    runcmd qw(git add -Af);
-    my $tree = cmdoutput qw(git write-tree);
+    runcmd @git, qw(add -Af);
+    my $tree = cmdoutput @git, qw(write-tree);
     chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
     return ($tree,$dir);
 }
@@ -192,7 +225,7 @@ sub generate_commit_from_dsc () {
     }
     runcmd qw(dget), @dget_opts, qw(--), $dscurl;
     foreach my $f (grep { is_orig_file($_) } @files) {
-	link $f, "../../../$f"
+	link $f, "../../../../$f"
 	    or $!==&EEXIST
 	    or die "$f $!";
     }
@@ -217,16 +250,16 @@ $clogp->{Changes}
 END
     close C or die $!;
     print "synthesised git commit from .dsc $clogp->{Version}\n";
-    my $commithash = cmdoutput qw(git hash-object -w -t commit ../commit.tmp);
+    my $commithash = cmdoutput @git, qw(hash-object -w -t commit ../commit.tmp);
     chdir '../../../..' or die $!;
-    cmdoutput qw(git update-ref -m),"dgit synthesise $clogp->{Version}",
+    cmdoutput @git, qw(update-ref -m),"dgit synthesise $clogp->{Version}",
               'DGIT_ARCHIVE', $commithash;
-    cmdoutput qw(git log -n2), $commithash;
+    cmdoutput @git, qw(log -n2), $commithash;
     # ... gives git a chance to complain if our commit is malformed
     my $outputhash = $commithash;
     if ($upload_hash) {
 	chdir "$ud/$dir" or die $!;
-	runcmd qw(git reset --hard), $upload_hash;
+	runcmd @git, qw(reset --hard), $upload_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
 	my $oldclogp = Dpkg::Control::Hash->new();
 	$oldclogp->parse('../changelogold.tmp','previous changelog') or die;
@@ -264,17 +297,17 @@ sub ensure_we_have_orig () {
 	$origurl .= "/$f";
 	die "$f ?" unless $f =~ m/^${package}_/;
 	die "$f ?" if $f =~ m#/#;
-	runcmd qw(sh -ec),'cd ..; exec dget -- "$1"','x',$origurl;
+	runcmd_ordryrun qw(sh -ec),'cd ..; exec dget -- "$1"','x',$origurl;
     }
 }
 
 sub rev_parse ($) {
-    return cmdoutput qw(git rev-parse --), "$_[0]~0";
+    return cmdoutput @git, qw(rev-parse --), "$_[0]~0";
 }
 
 sub is_fast_fwd ($$) {
     my ($ancestor,$child) = @_;
-    my $mb = cmdoutput qw(git merge-base), $dsc_hash, $upload_hash;
+    my $mb = cmdoutput @git, qw(merge-base), $dsc_hash, $upload_hash;
     return rev_parse($mb) eq rev_parse($ancestor);
 }
 
@@ -282,7 +315,8 @@ sub fetch_from_archive () {
     # ensures that rref(uploadbranch()) is what is actually in the archive,
     #  one way or another
     my $upload_ref = rref(uploadbranch());
-    $!=0; $upload_hash = `git show-ref --heads $upload_ref`;
+    $!=0; $upload_hash =
+	cmdoutput_errok @git, qw(show-ref --heads), $upload_ref;
     die $! if $!;
     die $? unless ($?==0 && chomp $upload_hash) 
 	or ($?==256 && !length $upload_hash);
@@ -301,11 +335,17 @@ sub fetch_from_archive () {
 	    unless is_fast_fwd($dsc_hash, $upload_hash);
     }
     if ($upload_hash ne $hash) {
-	cmdoutput qw(git update-ref -m), 'dgit fetch', $upload_ref, $hash;
+	my @upd_cmd = (@git, qw(update-ref -m), 'dgit fetch', $upload_ref, $hash);
+	if (!$dryrun) {
+	    cmdoutput @upd_cmd;
+	} else {
+	    dryrun_report @upd_cmd;
+	}
     }
 }
 
 sub clone () {
+    die "dry run makes no sense with clone" if $dryrun;
     get_archive_dsc();
     $dsc_hash = $dsc->{$ourdscfield};
     if (defined $dsc_hash) {
@@ -319,24 +359,24 @@ sub clone () {
     my $branch = uploadbranch();
     if (check_for_git()) {
 	print "cloning existing git history\n";
-	runcmd qw(git clone --origin),$remotename, qw(-b), $branch, '--',
-	    $alioth_git, $dstdir;
+	runcmd @git, qw(clone --origin),$remotename, qw(-b), $branch, '--',
+	    "$alioth_git/$package.git", $dstdir;
 	chdir "$dstdir" or die "$dstdir $!";
 	fetch_from_archive();
-	runcmd qw(git reset --hard), rref(uploadbranch());
+	runcmd @git, qw(reset --hard), rref(uploadbranch());
     } else {
 	print "starting new git history\n";
 	mkdir $dstdir or die "$dstdir $!";
 	chdir "$dstdir" or die "$dstdir $!";
-	runcmd qw(git init -q);
+	runcmd @git, qw(init -q);
 	open H, "> .git/HEAD" or die $!;
 	print H "ref: ".lref(uploadbranch())."\n" or die $!;
 	close H or die $!;
-	runcmd qw(git remote add), $remotename, $alioth_git;
+	runcmd @git, qw(remote add), $remotename, "$alioth_git/$package.git";
 	runcmd "git config branch.$branch.remote $remotename";
 	runcmd "git config branch.$branch.merge ".lref(uploadbranch());
 	my $newhash = generate_commit_from_dsc();
-	runcmd qw(git reset --hard), $newhash;
+	runcmd @git, qw(reset --hard), $newhash;
     }
     print "ready for work in $dstdir\n";
 }
@@ -344,7 +384,7 @@ sub clone () {
 sub fetch () {
     get_archive_dsc();
     if (check_for_git()) {
-	runcmd qw(git fetch -p),$remotename,
+	runcmd_ordryrun @git, qw(fetch -p),$remotename,
 	    '+refs/heads/*:refs/remotes/origin/*';
     }
     fetch_from_archive();
@@ -352,43 +392,48 @@ sub fetch () {
 
 sub pull () {
     fetch();
-    runcmd qw(git merge -m),"Merge from $suite [dgit]",lref(uploadbranch());
+    runcmd_ordryrun @git, qw(merge -m),"Merge from $suite [dgit]",
+        lref(uploadbranch());
 }
 
 sub dopush () {
-    runcmd qw(git diff --quiet HEAD);
+    runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
-    stat $dscfn or die "$dscfn $!";
+    stat "../$dscfn" or die "$dscfn $!";
     $dsc = parsecontrol("../$dscfn");
     prep_ud();
     chdir $ud or die $!;
     print "checking that $dscfn corresponds to HEAD\n";
     runcmd qw(dpkg-source -x --), "../../../../$dscfn";
-    my $tree = mktree_in_ud_from_only_subdir();
+    my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     chdir '../../../..' or die $!;
-    runcmd qw(git diff --exit-code), $tree;
+    runcmd @git, qw(diff --exit-code), $tree;
 #fetch from alioth
 #do fast forward check and maybe fake merge
 #    if (!is_fast_fwd(mainbranch
-#    runcmd qw(git fetch -p ), $alioth_git,
+#    runcmd @git, qw(fetch -p ), "$alioth_git/$package.git",
 #        map { lref($_).":".rref($_) }
 #        (uploadbranch());
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
+fixme need to sign changes
     if ($sign) {
-	runcmd qw(git tag -s),@git_tag_opts,qw(-m),
+	runcmd_ordryrun @git, qw(tag -s),@git_tag_opts,qw(-m),
 	    "Release $dsc->{Version} for $suite [dgit]";
-	unlink "../$dscfn.asc" or $!==&ENOENT or die "$dscfn.asc $!";
-	runcmd qw(gpg --clearsign),@gpg_opts,"../$dscfn";
-	rename "../$dscfn.asc","../$dscfn" or die "$dscfn $!";
+	my @sig_cmd = (@gpg, qw(--clearsign), "../$dscfn");
+	if (!$dryrun) {
+	    unlink "../$dscfn.asc" or $!==&ENOENT or die "$dscfn.asc $!";
+	    runcmd @sig_cmd;
+	    rename "../$dscfn.asc","../$dscfn" or die "$dscfn $!";
+	} else {
+	    dryrun_report @sig_cmd;
+	}
     }
-    if (!$nopush) {
-	runcmd qw(git push),$remotename,"HEAD:".lref(uploadbranch());
-	runcmd qw(dput),"../$dscfn";
-    }
+    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
+    runcmd_ordryrun qw(dput),"../$dscfn";
 }
 
 sub cmd_clone {
@@ -403,7 +448,8 @@ sub cmd_clone {
 }
 
 sub branchsuite () {
-    my $branch = `git-symbolic-ref HEAD`;
+    my $branch = cmdoutput_errok @git, qw(symbolic-ref);
+    chomp $branch;
     if ($branch =~ m#^refs/heads/$branchprefix/([^/.]+)$#o) {
 	return $1;
     } else {
@@ -411,7 +457,7 @@ sub branchsuite () {
     }
 }
 
-sub cmd_fetch {
+sub fetchpullargs () {
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     if (@ARGV==0) {
@@ -423,7 +469,16 @@ sub cmd_fetch {
     } else {
 	die;
     }
+}
+
+sub cmd_fetch {
+    fetchpullargs();
     fetch();
+}
+
+sub cmd_pull {
+    fetchpullargs();
+    pull();
 }
 
 sub cmd_push {
@@ -438,7 +493,37 @@ sub cmd_push {
 }
 
 sub parseopts () {
-    die if @ARGV && $ARGV[0] =~ m/^\-/;
+    while (@ARGV) {
+	last unless $ARGV[0];
+	$_ = shift @ARGV;
+	last if m/^--?$/;
+	if (m/^--/) {
+	    if (m/^--dry-run/) {
+		$dryrun=1;
+	    if (m/^--no-sign/) {
+		$sign=0;
+	    } else {
+		die "$_ ?";
+	    }
+	} else {
+	    while (m/^-./s) {
+		if (s/^-n/-/) {
+		    $dryrun=1;
+		} elsif (s/^-p(.*)//s) {
+		    $gpg[0] = $1;
+		} elsif (s/^-c(.*=.*)//s) {
+		    push @git, $1;
+		} elsif (s/^-k(.*)//s) {
+		    push @git_tag_opts, '-u', $1;
+		    push @gpg, '-u', $1;
+		} elsif (s/^-:([dtg])(.*)//s) {
+		    push @{ $opts_opt_map{$1} }, $_;
+		} else {
+		    die "$_ ?";
+		}
+	    }
+	}
+    }
 }
 
 parseopts();
