@@ -1,0 +1,360 @@
+#!/usr/bin/perl -w
+# dgit
+# Integration between git and Debian-style archives
+#
+# Copyright (C)2013 Ian Jackson
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+
+use IO::Handle;
+use Data::Dumper;
+use LWP::UserAgent;
+use Dpkg::Control::Hash;
+use File::Path;
+use POSIX;
+
+open DEBUG, ">&STDERR" or die $!;
+
+our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
+our $suite = 'sid';
+our $package;
+
+our $aliothname = 'iwj@git.debian.org';
+our $aliothpath = '/git/dgit-test';
+our $alioth_git = "git+ssh://$aliothname/$aliothpath";
+our $alioth_sshtestbodge = [$aliothname,$aliothpath];
+
+our (@dget_opts) = qw(-u);
+
+our $remotename = 'dgit';
+
+sub mainbranch () { return "$suite"; }
+sub uploadbranch () { return "upload/$suite"; }
+
+our $ua;
+
+sub url_get {
+    if (!$ua) {
+	$ua = LWP::UserAgent->new();
+	$ua->env_proxy;
+    }
+    print DEBUG "fetching @_...\n";
+    my $r = $ua->get(@_) or die $!;
+    die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
+    return $r->decoded_content();
+}
+
+our ($dscdata,$dscurl,$dsc);
+
+sub runcmd {
+    $!=0; $?=0;
+    die "@_ $! $?" if system @_;
+}
+
+sub cmdoutput {
+    open P, "-|", @_ or die $!;
+    my $d;
+    $!=0; $?=0;
+    { local $/ = undef; $d = <P>; }
+    die if P->error;
+    close P or die "@_ $? $!";
+    chomp $d;
+    return $d;
+}
+
+sub parsecontrol {
+    my $c = Dpkg::Control::Hash->new();
+    $c->load(@_) or return undef;
+    return $c;
+}
+
+sub parsechangelog {
+    my $c = Dpkg::Control::Hash->new();
+    my $p = new IO::File '-|', qw(dpkg-parsechangelog) or die $!;
+    $c->parse($p);
+    $?=0; $!=0; close $p or die "$! $?";
+    return $c;
+}
+
+sub get_archive_dsc () {
+    my $rmad = cmdoutput qw(rmadison -asource),"-s$suite",$package;
+    $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* \|
+                 \s*( [^ \t|]+ )\s* /x or die "$rmad $?";
+    $1 eq $package or die "$rmad $package ?";
+    my $vsn = $2;
+    $3 eq $suite or die "$rmad $suite ?";
+    $4 eq 'source' or die "$rmad ?";
+    # fixme it does not show us the component ?
+    my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
+    $dscurl = "$mirror/pool/main/$prefix/$package/${package}_$vsn.dsc";
+#print DEBUG Dumper($pdodata, $&, $dscurl);
+    $dscdata = url_get($dscurl);
+    my $dscfh = new IO::File \$dscdata, '<' or die $!;
+#print DEBUG Dumper($dscdata, $dscfh);
+    $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
+    $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
+#print DEBUG Dumper($dsc);
+    my $fmt = $dsc->{Format};
+    die "unsupported format $fmt, sorry\n" unless $fmt eq '1.0';
+}
+
+sub check_for_git () {
+    # returns 0 or 1
+    my $cmd= 
+	"ssh $alioth_sshtestbodge->[0] '".
+	" set -e; cd /git/dgit-test;".
+	" if test -d $package.git; then echo 1; else echo 0; fi".
+	"'";
+    #print DEBUG "$cmd\n";
+    open P, "$cmd |" or die $!;
+    $!=0; $?=0;
+    my $r = <P>; close P;
+#print STDERR ">$r<\n";
+    die "$r $! $?" unless $r =~ m/^[01]$/;
+    return $r+0;
+}
+
+our ($dsc_hash,$lastupl_hash);
+
+our $ud = '.git/dgit/unpack';
+
+sub prep_ud () {
+    rmtree($ud);
+    mkpath '.git/dgit';
+    mkdir $ud or die $!;
+}
+
+sub mktree_in_ud_from_only_subdir () {
+    # changes into the subdir
+    my (@dirs) = <*/.>;
+    die unless @dirs==1;
+    $dirs[0] =~ m#^([^/]+)/\.$# or die;
+    my $dir = $1;
+    chdir $dir or die "$dir $!";
+    die if stat '.git';
+    die $! unless $!==&ENOENT;
+    runcmd qw(git init -q);
+    rmtree('.git/objects');
+    symlink '../../../../objects','.git/objects' or die $!;
+    runcmd qw(git add -Af);
+    my $tree = cmdoutput qw(git write-tree);
+    chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
+    return ($tree,$dir);
+}
+
+sub generate_commit_from_dsc () {
+    prep_ud();
+    chdir $ud or die $!;
+    my @files;
+    foreach (split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files})) {
+	next unless m/\S/;
+	m/^\w+ \d+ (\S+)$/ or die "$_ ?";
+	my $f = $1;
+	die if $f =~ m#/|^\.|\.dsc$|\.tmp$#;
+	push @files, $f;
+	link "../../../$f", $f
+	    or $!==&ENOENT
+	    or die "$f $!";
+    }
+    runcmd qw(dget), @dget_opts, qw(--), $dscurl;
+    foreach my $f (grep { m/\.tar\.gz$/ } @files) {
+	link $f, "../../../$f"
+	    or $!==&EEXIST
+	    or die "$f $!";
+    }
+    my ($tree,$dir) = mktree_in_ud_from_only_subdir();
+    runcmd qw(sh -ec), 'dpkg-parsechangelog >../changelog.tmp';
+    my $clogp = parsecontrol('../changelog.tmp','changelog') or die;
+    my $date = cmdoutput qw(date), '+%s %z', qw(-d),$clogp->{Date};
+    my $author = $clogp->{Maintainer};
+    $author =~ s#,.*##ms;
+    my $authline = "$author $date";
+    $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or die $authline;
+    open C, ">../commit.tmp" or die $!;
+    print C "tree $tree\n" or die $!;
+    print C "parent $lastupl_hash\n" or die $! if defined $lastupl_hash;
+    print C <<END or die $!;
+author $authline
+committer $authline
+
+$clogp->{Changes}
+
+# imported by dgit from the archive
+END
+    close C or die $!;
+    print "synthesised git commit from .dsc $clogp->{Version}\n";
+    my $commithash = cmdoutput qw(git hash-object -w -t commit ../commit.tmp);
+    chdir '../../../..' or die $!;
+    cmdoutput qw(git update-ref -m),"dgit synthesise $clogp->{Version}",
+              'DGIT_ARCHIVE', $commithash;
+    cmdoutput qw(git log -n2), $commithash;
+    # ... gives git a chance to complain if our commit is malformed
+    my $outputhash = $commithash;
+    if (defined $lastupl_hash) {
+	chdir "$ud/$dir" or die $!;
+	runcmd qw(git reset --hard), $lastupl_hash;
+	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
+	my $oldclogp = Dpkg::Control::Hash->new();
+	$oldclogp->parse('../changelogold.tmp','previous changelog') or die;
+	my $vcmp =
+	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
+	if ($vcmp < 0) {
+	    # git upload/ is earlier vsn than archive, use archive
+	} elsif ($vcmp >= 0) {
+	    print STDERR <<END or die $!;
+Version actually in archive:    $clogp->{Version} (older)
+Last allegedly pushed/uploaded: $oldclogp->{Version} (newer or same)
+Perhaps the upload is stuck in incoming.  Using the version from git.
+END
+	} else {
+	    die "version in archive is same as version in git".
+		" to-be-uploaded (upload/) branch but archive".
+		" version hash no commit hash?!\n";
+        }
+	chdir '../../../..' or die $!;
+    }
+    rmtree($ud);
+    return $outputhash;
+}
+
+my $lastupl_ref = "refs/remotes/$remotename/upload/$suite";
+
+sub rev_parse ($) {
+    return cmdoutput qw(git rev-parse --), "$_[0]~0";
+}
+
+sub is_fast_fwd ($$) {
+    my ($ancestor,$child) = @_;
+    my $mb = cmdoutput qw(git merge-base), $dsc_hash, $lastupl_hash;
+    return rev_parse($mb) eq rev_parse($ancestor);
+}
+
+sub fetch_from_archive () {
+    # ensures that $lastupl_ref is what is actually in the archive,
+    #  one way or another
+    $!=0; $lastupl_hash = `git show-ref --heads $lastupl_ref`;
+    die $! if $!;
+    die $? unless ($?==0 && chomp $lastupl_hash) 
+	or ($?==128 && !length $lastupl_hash);
+    my $hash;
+    if (defined $dsc_hash) {
+	$hash = $dsc_hash;
+    } else {
+	$hash = generate_commit_from_dsc();
+    }
+    if ($lastupl_hash) {
+	die "not fast forward on last upload branch!".
+	    " (archive's version left in DGIT_ARCHIVE)"
+	    unless is_fast_fwd($lastupl_hash, $dsc_hash);
+    }
+    if ($lastupl_ref ne $hash) {
+	cmdoutput qw(git update-ref -m), 'dgit fetch', $lastupl_ref, $hash;
+    }
+}
+
+sub clone () {
+    get_archive_dsc();
+    $dsc_hash = $dsc->{'Vcs-git-master'};
+    if (defined $dsc_hash) {
+	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
+	$dsc_hash = $&;
+	print "last upload to archive specified git hash\n";
+    } else {
+	print "last upload to archive has NO git hash\n";
+    }
+    my $dstdir = "$package";
+    if (check_for_git()) {
+	print "cloning existing git history\n";
+	runcmd qw(git clone --origin),$remotename, qw(-b), $suite, '--',
+	    $alioth_git, $dstdir;
+	chdir "$dstdir" or die "$dstdir $!";
+	fetch_from_archive();
+	runcmd qw(git reset --hard), $lastupl_ref;
+    } else {
+	die "missing git history even though dsc has hash" if defined $dsc_hash;
+	print "starting new git history\n";
+	mkdir $dstdir or die "$dstdir $!";
+	chdir "$dstdir" or die "$dstdir $!";
+	runcmd qw(git init -q);
+	open H, "> .git/HEAD" or die $!;
+	print H "ref: refs/heads/$suite\n" or die $!;
+	close H or die $!;
+	runcmd qw(git remote add), $remotename, $alioth_git;
+	runcmd "git config branch.$suite.remote $remotename";
+	runcmd "git config branch.$suite.merge refs/heads/$suite";
+	my $newhash = generate_commit_from_dsc();
+	runcmd qw(git reset --hard), $newhash;
+    }
+    print "ready for work in $dstdir\n";
+}
+
+sub fetch () {
+    
+}
+
+sub push () {
+    runcmd qw(git diff --quiet HEAD);
+    my $clogp = parsechangelog();
+    $package = $clogp->{Source};
+    my $dscfn = "${package}_$clogp->{Version}.dsc";
+    stat $dscfn or die "$dscfn $!";
+    $dsc = parsecontrol("../$dscfn");
+    prep_ud();
+    chdir $ud or die $!;
+    print "checking that $dscfn corresponds to HEAD\n";
+    runcmd qw(dpkg-source -x --), "../../../../$dscfn";
+    my $tree = mktree_in_ud_from_only_subdir();
+    chdir '../../../..' or die $!;
+    runcmd qw(git diff --exit-code), $tree;
+    runcmd qw(git fetch), $alioth_git,
+        map { "$_:refs/remotes/$remotename/$_" }
+        (mainbranch(), uploadbranch());
+    die <<END;
+    if (!is_fast_fwd(mainbranch
+xxx introduce remote_lref
+xxx use remote_lref everywhere
+
+fetch from alioth
+do fast forward check and maybe fake merge
+push to uploading
+dput
+push to main
+END
+}
+
+sub cmd_clone {
+    if (@ARGV==1) {
+	($package) = @ARGV;
+    } elsif (@ARGV==2) {
+	($package,$suite) = @ARGV;
+    } else {
+	die;
+    }
+    clone();
+}
+
+sub parseopts () {
+    die if @ARGV && $ARGV[0] =~ m/^\-/;
+}
+
+parseopts();
+die unless @ARGV;
+my $cmd = shift @ARGV;
+parseopts();
+
+{ no strict qw(refs); &{"cmd_$cmd"}(); }

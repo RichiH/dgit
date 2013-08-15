@@ -1,0 +1,22 @@
+Source: dgit
+Section: devel
+Priority: optional
+Maintainer: Ian Jackson <ijackson@chiark.greenend.org.uk>
+Standards-Version: 3.9.4.0
+Build-Depends: debhelper (>= 9)
+
+Package: dgit
+Depends: perl, libwww-perl, libdpkg-perl, git-core, devscripts, dpkg-dev,
+         ${misc:Depends}
+Recommends: ssh-client
+Architecture: all
+Description: git interoperability with the Debian archive
+ dgit (with the associated infrastructure) makes it possible to
+ treat the Debian archive as a git repository.
+ .
+ dgit push constructs uploads from git commits
+ .
+ dgit clone and dgit fetch construct git commits from uploads.
+ .
+ WARNING: This program is INCOMPLETE and WRONG and should not yet
+ be used.  It is being uploaded to facilitate development.

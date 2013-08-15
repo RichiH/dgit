@@ -1,0 +1,17 @@
+Download orig.tar.gz even if archive has hash
+
+Fix branch names to contain dgit
+
+Cope with outside-main things (rmadison does not print pool path)
+
+Cope with non-Debian archives
+
+Make it possible to do dgit clone / fetch anonymously
+
+Archive agility.  Archive needs to specify (a) way to get versions
+and paths in archive for dscs (b) unpriv pull location (c) priv
+push location
+
+Support Format 3.0 (quilt)
+
+Push access for DMs.
