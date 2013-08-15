@@ -131,7 +131,7 @@ sub check_for_git () {
     return $r+0;
 }
 
-our ($dsc_hash,$lastupl_hash);
+our ($dsc_hash,$upload_hash);
 
 our $ud = '.git/dgit/unpack';
 
@@ -189,7 +189,7 @@ sub generate_commit_from_dsc () {
     $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or die $authline;
     open C, ">../commit.tmp" or die $!;
     print C "tree $tree\n" or die $!;
-    print C "parent $lastupl_hash\n" or die $! if defined $lastupl_hash;
+    print C "parent $upload_hash\n" or die $! if defined $upload_hash;
     print C <<END or die $!;
 author $authline
 committer $authline
@@ -207,9 +207,9 @@ END
     cmdoutput qw(git log -n2), $commithash;
     # ... gives git a chance to complain if our commit is malformed
     my $outputhash = $commithash;
-    if (defined $lastupl_hash) {
+    if (defined $upload_hash) {
 	chdir "$ud/$dir" or die $!;
-	runcmd qw(git reset --hard), $lastupl_hash;
+	runcmd qw(git reset --hard), $upload_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
 	my $oldclogp = Dpkg::Control::Hash->new();
 	$oldclogp->parse('../changelogold.tmp','previous changelog') or die;
@@ -240,31 +240,33 @@ sub rev_parse ($) {
 
 sub is_fast_fwd ($$) {
     my ($ancestor,$child) = @_;
-    my $mb = cmdoutput qw(git merge-base), $dsc_hash, $lastupl_hash;
+    my $mb = cmdoutput qw(git merge-base), $dsc_hash, $upload_hash;
     return rev_parse($mb) eq rev_parse($ancestor);
 }
 
 sub fetch_from_archive () {
     # ensures that rref(uploadbranch()) is what is actually in the archive,
     #  one way or another
-    my $lastupl_ref = rref(uploadbranch());
-    $!=0; $lastupl_hash = `git show-ref --heads $lastupl_ref`;
+    my $upload_ref = rref(uploadbranch());
+    $!=0; $upload_hash = `git show-ref --heads $upload_ref`;
     die $! if $!;
-    die $? unless ($?==0 && chomp $lastupl_hash) 
-	or ($?==128 && !length $lastupl_hash);
+    die $? unless ($?==0 && chomp $upload_hash) 
+	or ($?==128 && !length $upload_hash);
     my $hash;
     if (defined $dsc_hash) {
+	die "missing git history even though dsc has hash"
+	    unless length $upload_hash;
 	$hash = $dsc_hash;
     } else {
 	$hash = generate_commit_from_dsc();
     }
-    if ($lastupl_hash) {
+    if (length $upload_hash) {
 	die "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
-	    unless is_fast_fwd($lastupl_hash, $dsc_hash);
+	    unless is_fast_fwd($dsc_hash, $upload_hash);
     }
-    if ($lastupl_ref ne $hash) {
-	cmdoutput qw(git update-ref -m), 'dgit fetch', $lastupl_ref, $hash;
+    if ($upload_hash ne $hash) {
+	cmdoutput qw(git update-ref -m), 'dgit fetch', $upload_ref, $hash;
     }
 }
 
@@ -287,7 +289,6 @@ sub clone () {
 	fetch_from_archive();
 	runcmd qw(git reset --hard), rref(uploadbranch());
     } else {
-	die "missing git history even though dsc has hash" if defined $dsc_hash;
 	print "starting new git history\n";
 	mkdir $dstdir or die "$dstdir $!";
 	chdir "$dstdir" or die "$dstdir $!";
@@ -305,7 +306,16 @@ sub clone () {
 }
 
 sub fetch () {
-    
+    if (check_for_git()) {
+	runcmd qw(git fetch -p),$remotename,
+	    '+refs/heads/*:refs/remotes/origin/*';
+    }
+    fetch_from_archive();
+}
+
+sub pull () {
+    fetch();
+    runcmd qw(git merge),lref(uploadbranch());
 }
 
 sub push () {
