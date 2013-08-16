@@ -26,8 +26,6 @@ use Dpkg::Control::Hash;
 use File::Path;
 use POSIX;
 
-open DEBUG, ">&STDERR" or die $!;
-
 our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
 our $package;
@@ -46,6 +44,8 @@ our (@dget) = qw(dget);
 our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
 our $keyid;
+
+open DEBUG, ">/dev/null" or die $!;
 
 our %opts_opt_map = ('dget' => \@dget,
 		     'dput' => \@dput,
@@ -67,7 +67,7 @@ sub url_get {
 	$ua = LWP::UserAgent->new();
 	$ua->env_proxy;
     }
-    print DEBUG "fetching @_...\n";
+    print "fetching @_...\n";
     my $r = $ua->get(@_) or die $!;
     die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
     return $r->decoded_content();
@@ -75,12 +75,30 @@ sub url_get {
 
 our ($dscdata,$dscurl,$dsc);
 
+sub printcmd {
+    my $fh = shift @_;
+    my $intro = shift @_;
+    print $fh $intro or die $!;
+    local $_;
+    foreach my $a (@_) {
+	$_ = $a;
+	if (s{['\\]}{\\$&}g || m{\s} || m{[^-_./0-9a-z]}i) {
+	    print $fh " '$_'" or die $!;
+	} else {
+	    print $fh " $_" or die $!;
+	}
+    }
+    print $fh "\n" or die $!;
+}
+
 sub runcmd {
+    printcmd(\*DEBUG,"+",@_);
     $!=0; $?=0;
     die "@_ $! $?" if system @_;
 }
 
 sub cmdoutput_errok {
+    printcmd(\*DEBUG,"|",@_);
     open P, "-|", @_ or die $!;
     my $d;
     $!=0; $?=0;
@@ -98,17 +116,7 @@ sub cmdoutput {
 }
 
 sub dryrun_report {
-    print "#" or die $!;
-    local $_;
-    foreach my $a (@_) {
-	$_ = $a;
-	if (s{['\\]}{\\$&}g || m{\s} || m{[^-_./0-9a-z]}i) {
-	    print " '$_'" or die $!;
-	} else {
-	    print " $_" or die $!;
-	}
-    }
-    print "\n" or die $!;
+    printcmd(\*STDOUT,"#",@_);
 }
 
 sub runcmd_ordryrun {
@@ -162,13 +170,12 @@ sub get_archive_dsc () {
     # fixme madison does not show us the component
     my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
     $dscurl = "$mirror/pool/main/$prefix/$package/${package}_$vsn.dsc";
-#print DEBUG Dumper($pdodata, $&, $dscurl);
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
-#print DEBUG Dumper($dscdata, $dscfh);
+    print DEBUG Dumper($dscdata);
     $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
     $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
-#print DEBUG Dumper($dsc);
+    print DEBUG Dumper($dsc);
     my $fmt = $dsc->{Format};
     die "unsupported format $fmt, sorry\n" unless $fmt eq '1.0';
 }
@@ -180,11 +187,11 @@ sub check_for_git () {
 	" set -e; cd $alioth_sshtestbodge->[1];".
 	" if test -d $package.git; then echo 1; else echo 0; fi".
 	"'";
-    #print DEBUG "$cmd\n";
+    print DEBUG "$cmd\n";
     open P, "$cmd |" or die $!;
     $!=0; $?=0;
     my $r = <P>; close P;
-#print STDERR ">$r<\n";
+    print DEBUG ">$r<\n";
     die "$r $! $?" unless $r =~ m/^[01]$/;
     return $r+0;
 }
@@ -437,7 +444,11 @@ sub dopush () {
 #        (uploadbranch());
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
-    rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
+    if (!$dryrun) {
+	rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
+    } else {
+	print "[new .dsc left in $dscfn.tmp]\n";
+    }
     if (!$changesfile) {
 	my $pat = "../${package}_$clogp->{Version}_*.changes";
 	my @cs = glob $pat;
@@ -560,6 +571,8 @@ sub parseopts () {
 	    while (m/^-./s) {
 		if (s/^-n/-/) {
 		    $dryrun=1;
+		} elsif (s/^-D/-/) {
+		    open DEBUG, ">&STDERR" or die $!;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, $1;
 		} elsif (s/^-C(.*)//s) {

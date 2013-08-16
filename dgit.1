@@ -1,0 +1,160 @@
+.TH dgit 1 "" "Debian Project" "dgit"
+.SH NAME
+dgit \- git integration with the Debian archive
+.
+.SH SYNOPSIS
+.B dgit
+[\fIdgit\-options\fP] \fBclone\fP [\fIdgit\-options\fP]
+\fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdest-dir|\fB/\fP\fIdest-dir]
+.br
+.B dgit
+[\fIdgit\-options\fP] \fBfetch\fP|\fBpull\fP [\fIdgit\-options\fP]
+[\fIsuite\fP]
+.br
+.B dgit
+[\fIdgit\-options\fP] \fBbuild\fP
+[\fIgit\-buildpackage\-options\fP|\fIdpkg\-buildpackage\-options\fp]
+.br
+.B dgit
+[\fIdgit\-options\fP] \fBpush\fP [\fIdgit\-options\fP]
+[\fIsuite\fP]
+.SH DESCRIPTION
+.B dgit
+treats the Debian archive as a version control system, and
+bidirectionally gateways between the archive and git.  The git view of
+the package can contain the usual upstream git history, and will be
+augmented by commits representing uploads done without using dgit.
+This git history is stored in a canonical location
+.B dgit-repos
+which lives outside the Debian archive.
+
+.B dgit clone
+and
+.B dgit fetch
+consult the archive and dgit-repos and fetch and/or construct the
+git view of the history.  With clone, the destination directory (by
+default, the package name in the current directory) will be created.
+
+.B dgit build
+runs
+.B git-buildpackage
+with some suitable options.  Options after
+.B build
+will be passed on to git-buildpackage.  It is not necessary to
+use dgit build; it is OK to use any approach which ensures that
+the generated source package corresponds to the relevant git commit.
+Tagging and signing should be left to dgit push.
+
+.B dgit push
+does an "upload", pushing the current HEAD to the archive (as a source
+package) and to dgit-repos (as git commits).  This also involves
+making a signed git tag, and signing the files to be uploaded to the
+archive.
+.SH MODEL AND WORKFLOW
+You may use any suitable git workflow with dgit, provided you
+satisfy dgit's requirements:
+
+The
+.B dgit-repos
+repository for each package contains one branch per suite named
+\fBdgit/\fR\fIsuite\fR.  These should be pushed to only by
+dgit.  They are fast forwarding.  Each push on this branch
+corresponds to an upload (or attempted upload).
+
+dgit push can operate on any commit which is a descendant of the
+current dgit/suite tip in dgit-repos.
+
+Uploads made by dgit contain an additional field
+.B Vcs-Git-Master
+in the source package .dsc.  (This is added by dgit push.)
+This specifies a commit (an ancestor of the dgit/suite
+branch) whose tree is identical to the unpacked source upload.
+
+Uploads not made by dgit are represented in git by commits which are
+synthesised by dgit.  The tree of each such commit corresponds to the
+unpacked source; the single parent is the last known upload - that is,
+the contents of the dgit/suite branch.
+
+dgit expects repos that it works with to have a
+.B dgit
+remote.  This refers to the well-known dgit-repos location
+(currently, the dgit-repos project on Alioth).  dgit fetch updates
+the remote tracking branch for dgit/suite.
+.SH OPTIONS
+.TP
+.BR --dry-run | -n
+Go through the motions, fetching all information needed, but do not
+actually update the output(s).  For fetch and pull, dgit determines
+which git commit corresponds to the archive but does not update
+remotes/dgit/dgit/suite or do any merge.  For push, dgit does
+the required checks and leaves the new .dsc in a temporary file,
+but does not sign, tag, push or upload.
+.TP
+.BI -k keyid
+Use
+.I keyid
+for signing the tag and the upload.
+.TP
+.BR --no-sign
+does not sign tags or uploads (meaningful only with push).
+.TP
+.BI -D
+Spew debugging information to stderr.
+.TP
+.BI -c name = value
+Specifies a git configuration option.  dgit itself is also controlled
+by git configuration options.
+.TP
+.RI \fB--dget=\fR program |\fB--dput=\fR program |\fB--debsign=\fR program
+Specifies alternative programs to use instead of dget, dput
+or debsign.
+.TP
+.RI \fB--dget:\fR option |\fB--dput:\fR option |\fB--debsign:\fR option
+Specifies a single additional option to pass to dget, dput or
+debsign.  Use repeatedly if multiple additional options are required.
+.TP
+.BI -C changesfile
+Specifies the .changes file which is to be uploaded.  By default
+dgit push looks for single .changes file in the parent directory whose
+filename suggests they it is for the right package and version.
+.SH BUGS
+dgit currently only works with Format 1.0 packages.
+
+dgit is not nearly configurable enough.  The locations for dgit-repos
+(on alioth) and for the Debian archive are currently hardcoded.
+There is not yet any support for suites which are in different
+distributions to Debian.
+
+dgit will only work with packages in main. The madison http query API
+does not give the component.
+
+dgit assumes knowledge of the archive layout.  There appears to be no
+sane way to find the path in the archive pool of the .dsc for a
+particular suite.
+
+The mechanism for checking for and creating per-package repos on
+alioth is a hideous bodge.  One consequence is that dgit currently
+only works for people with push access.
+
+Debian Maintainers are currently not able to push, as there is not
+currently any mechanism for determining and honouring the archive's
+ideas about access control.  Currently only DDs can push.
+
+dgit's representation of Format 3.0 (quilt) source packages (even if
+they were supported) would not represent the patch stack.  Currently
+the patch series representation cannot round trip through the archive.
+Ideally dgit would represent a quilty package with an origin commit of
+some kind followed by the patch stack as a series of commits followed
+by a pseudo-merge (to make the branch fast-forwarding).  This would
+also mean a new "dgit rebase-prep" command or some such to turn such a
+fast-forwarding branch back into a rebasing patch stack, and a "force"
+option to dgit push (perhaps enabled automatically) which will make
+the required pseudo-merge.
+
+dgit's handling of .orig.tar.gz is not very sophisticated.  Ideally
+the .orig.tar.gz could be transported via the git repo as git tags.
+
+The error messages are often unhelpfully terse and tend to refer to
+line numbers in dgit.
+
+The option parser requires values to be cuddled to the option name.

@@ -1,3 +1,5 @@
+clone support for output dir spec.
+
 push should push to dgit remote (other branches)
 manpage should say not to push to suite branches
 newly cloned repos should have suite branches marked not to push
