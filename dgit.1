@@ -4,29 +4,30 @@ dgit \- git integration with the Debian archive
 .
 .SH SYNOPSIS
 .B dgit
-[\fIdgit\-options\fP] \fBclone\fP [\fIdgit\-options\fP]
-\fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdest-dir|\fB/\fP\fIdest-dir]
+[\fIdgit\-opts\fP] \fBclone\fP [\fIdgit\-opts\fP]
+\fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir]
 .br
 .B dgit
-[\fIdgit\-options\fP] \fBfetch\fP|\fBpull\fP [\fIdgit\-options\fP]
+[\fIdgit\-opts\fP] \fBfetch\fP|\fBpull\fP [\fIdgit\-opts\fP]
 [\fIsuite\fP]
 .br
 .B dgit
-[\fIdgit\-options\fP] \fBbuild\fP
-[\fIgit\-buildpackage\-options\fP|\fIdpkg\-buildpackage\-options\fp]
+[\fIdgit\-opts\fP] \fBbuild\fP
+[\fIgit\-buildpackage\-opts\fP|\fIdpkg\-buildpackage\-opts\fp]
 .br
 .B dgit
-[\fIdgit\-options\fP] \fBpush\fP [\fIdgit\-options\fP]
+[\fIdgit\-opts\fP] \fBpush\fP [\fIdgit\-opts\fP]
 [\fIsuite\fP]
 .SH DESCRIPTION
 .B dgit
 treats the Debian archive as a version control system, and
 bidirectionally gateways between the archive and git.  The git view of
 the package can contain the usual upstream git history, and will be
-augmented by commits representing uploads done without using dgit.
-This git history is stored in a canonical location
+augmented by commits representing uploads done by other developers not
+using dgit.  This git history is stored in a canonical location known
+as
 .B dgit-repos
-which lives outside the Debian archive.
+which lives outside the Debian archive (currently, on Alioth).
 
 .B dgit clone
 and
@@ -64,7 +65,7 @@ plain git.
 The
 .B dgit-repos
 repository for each package contains one ref per suite named
-\fBdrefs/git/\fR\fIsuite\fR.  These should be pushed to only by
+\fBrefs/dgit/\fR\fIsuite\fR.  These should be pushed to only by
 dgit.  They are fast forwarding.  Each push on this branch
 corresponds to an upload (or attempted upload).
 
@@ -176,6 +177,10 @@ does not give the component.
 dgit assumes knowledge of the archive layout.  There appears to be no
 sane way to find the path in the archive pool of the .dsc for a
 particular suite.
+
+We should be using some kind of vhost/vpath setup for the git repos on
+alioth, so that they can be moved later if and when this turns out to
+be a good idea.
 
 Debian Policy needs to be updated to describe the new Vcs-Git-Master
 field (and to specify that it is an RC bug for that field to refer
