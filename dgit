@@ -143,7 +143,7 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 
 sub cfg {
     foreach my $c (@_) {
-	my $v = cmdoutput_errok(qw(git config --), $c);
+	my $v = cmdoutput_errok(@git, qw(config --), $c);
 	if ($?==0) {
 	    chomp $v;
 	    return $v;
@@ -542,7 +542,9 @@ sub dopush () {
 	runcmd_ordryrun @debsign_cmd;
     }
     runcmd_ordryrun @git, qw(push),access_giturl(),"refs/tags/$tag";
-    runcmd_ordryrun @dput, $changesfile;
+    my $host = access_cfg('upload-host');
+    my @hostarg = defined($host) ? ($host,) : ();
+    runcmd_ordryrun @dput, @hostarg, $changesfile;
 }
 
 sub cmd_clone {
@@ -654,7 +656,7 @@ sub parseopts () {
 		} elsif (s/^-D/-/) {
 		    open DEBUG, ">&STDERR" or die $!;
 		} elsif (s/^-c(.*=.*)//s) {
-		    push @git, $1;
+		    push @git, '-c', $1;
 		} elsif (s/^-C(.*)//s) {
 		    $changesfile = $1;
 		} elsif (s/^-k(.*)//s) {
