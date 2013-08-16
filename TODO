@@ -1,5 +1,7 @@
 clone support for output dir spec.
 
+format 3.0 multiple tarballs
+
 push should push to dgit remote (other branches)
 manpage should say not to push to suite branches
 newly cloned repos should have suite branches marked not to push
