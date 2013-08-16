@@ -668,8 +668,9 @@ sub cmd_build {
     canonicalise_suite();
     runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
-            "--git-debian-branch=".lbranch(),
-            @ARGV;
+	'--git-builder=dpkg-buildpackage -i\.git/ -I.git',
+	"--git-debian-branch=".lbranch(),
+	@ARGV;
 }
 
 sub parseopts () {
