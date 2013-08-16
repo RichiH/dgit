@@ -19,17 +19,25 @@
 INSTALL=install
 INSTALL_DIR=$(INSTALL) -d
 INSTALL_PROGRAM=$(INSTALL) -m 755
+INSTALL_DATA=$(INSTALL) -m 644
+
 prefix?=/usr/local
 
+bindir=$(prefix)/bin
+mandir=$(prefix)/share/man
+man1dir=$(mandir)/man1
+
 PROGRAMS=dgit
+MAN1PAGES=dgit.1
 
 all:
 
 install:	installdirs
-	$(INSTALL_PROGRAM) $(PROGRAMS) $(DESTDIR)$(prefix)/bin
+	$(INSTALL_PROGRAM) $(PROGRAMS) $(DESTDIR)$(bindir)
+	$(INSTALL_DATA) $(MAN1PAGES) $(DESTDIR)$(man1dir)
 
 installdirs:
-	$(INSTALL_DIR) $(DESTDIR)$(prefix)/bin
+	$(INSTALL_DIR) $(DESTDIR)$(bindir) $(DESTDIR)$(man1dir)
 
 check installcheck:
 
