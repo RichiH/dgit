@@ -49,7 +49,7 @@ our %opts_opt_map = ('dget' => \@dget,
 		     'debsign' => \@debsign);
 
 our $remotename = 'dgit';
-our $ourdscfield = 'Vcs-Git-Master';
+our $ourdscfield = 'Vcs-Dgit-Master';
 our $branchprefix = 'dgit';
 
 sub lbranch () { return "$branchprefix/$suite"; }
