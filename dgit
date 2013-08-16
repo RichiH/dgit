@@ -246,7 +246,6 @@ sub canonicalise_suite () {
 
 sub get_archive_dsc () {
     my ($vsn,$subpath) = archive_query();
-    # fixme madison does not show us the component
     $dscurl = access_cfg('mirror').$subpath;
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
