@@ -222,6 +222,9 @@ branch back into a rebasing patch stack, and a `force' option to dgit
 push (perhaps enabled automatically by a note left by rebase-prep)
 which will make the required pseudo-merge.
 
+If the dgit push fails halfway through, it should be restartable and
+idempotent.  However this is not true for the git tag operation.
+
 dgit's handling of .orig.tar.gz is not very sophisticated.  Ideally
 the .orig.tar.gz could be transported via the git repo as git tags.
 Doing this is made more complicated by the possibility of a `3.0
