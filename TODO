@@ -1,3 +1,7 @@
+push should push to dgit remote (other branches)
+manpage should say not to push to suite branches
+newly cloned repos should have suite branches marked not to push
+
 Cope with outside-main things (rmadison does not print pool path)
 
 Cope with non-Debian archives
