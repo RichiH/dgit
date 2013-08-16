@@ -1,26 +1,11 @@
 clone support for output dir spec.
 
-format 3.0 multiple tarballs
-
 config for repo locations
-
 
 push should push to dgit remote (other branches)
 manpage should say not to push to suite branches
 newly cloned repos should have suite branches marked not to push
 
-Cope with outside-main things (rmadison does not print pool path)
-
-Cope with non-Debian archives
-
-Make it possible to do dgit clone / fetch anonymously
-
 Archive agility.  Archive needs to specify (a) way to get versions
 and paths in archive for dscs (b) unpriv pull location (c) priv
 push location
-
-Support Format 3.0 (quilt)
-
-Push access for DMs.
-
-Have option to do fake merge thing.
