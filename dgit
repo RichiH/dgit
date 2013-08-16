@@ -576,6 +576,7 @@ sub dopush () {
 }
 
 sub cmd_clone {
+    parseopts();
     my $dstdir;
     die if defined $package;
     if (@ARGV==1) {
@@ -625,16 +626,19 @@ sub fetchpullargs () {
 }
 
 sub cmd_fetch {
+    parseopts();
     fetchpullargs();
     fetch();
 }
 
 sub cmd_pull {
+    parseopts();
     fetchpullargs();
     pull();
 }
 
 sub cmd_push {
+    parseopts();
     die if defined $package;
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
@@ -656,6 +660,7 @@ sub cmd_push {
 }
 
 sub cmd_build {
+    # we pass further options and args to git-buildpackage
     die if defined $package;
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
@@ -713,6 +718,5 @@ sub parseopts () {
 parseopts();
 die unless @ARGV;
 my $cmd = shift @ARGV;
-parseopts();
 
 { no strict qw(refs); &{"cmd_$cmd"}(); }
