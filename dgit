@@ -32,6 +32,7 @@ our $package;
 our $sign = 1;
 our $dryrun = 0;
 our $changesfile;
+our $new_package = 0;
 
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
@@ -217,6 +218,9 @@ sub archive_query () {
     my $url = $'; #';
     die unless $proto eq 'madison';
     $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite","-u$url",$package;
+    if (!length $rmad) {
+	return ();
+    }
     $rmad =~ m{^ \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|/]+ )(?:/([^ \t|/]+)) \s* \|
@@ -246,6 +250,7 @@ sub canonicalise_suite () {
 
 sub get_archive_dsc () {
     my ($vsn,$subpath) = archive_query();
+    if (!defined $vsn) { $dsc=undef; return undef; }
     $dscurl = access_cfg('mirror').$subpath;
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
@@ -435,7 +440,7 @@ sub git_fetch_us () {
 sub fetch_from_archive () {
     # ensures that lrref() is what is actually in the archive,
     #  one way or another
-    get_archive_dsc();
+    get_archive_dsc() or return 0;
     $dsc_hash = $dsc->{$ourdscfield};
     if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
@@ -476,6 +481,7 @@ sub fetch_from_archive () {
 	    dryrun_report @upd_cmd;
 	}
     }
+    return 1;
 }
 
 sub clone ($) {
@@ -496,7 +502,7 @@ sub clone ($) {
     } else {
 	print "starting new git history\n";
     }
-    fetch_from_archive();
+    fetch_from_archive() or die;
     runcmd @git, qw(reset --hard), lrref();
     print "ready for work in $dstdir\n";
 }
@@ -505,7 +511,7 @@ sub fetch () {
     if (check_for_git()) {
 	git_fetch_us();
     }
-    fetch_from_archive();
+    fetch_from_archive() or die;
 }
 
 sub pull () {
@@ -634,9 +640,17 @@ sub cmd_push {
     $package = $clogp->{Source};
     if (@ARGV==0) {
 	$suite = $clogp->{Distribution};
-	canonicalise_suite();
+	if ($new_package) {
+	    local ($package) = 'dpkg';
+	    canonicalise_suite();
+	}
     } else {
 	die;
+    }
+    if (fetch_from_archive()) {
+	is_fast_fwd(lrref(), 'HEAD') or die;
+    } else {
+	die unless $new_package;
     }
     dopush();
 }
@@ -664,6 +678,8 @@ sub parseopts () {
 		$dryrun=1;
 	    } elsif (m/^--no-sign$/) {
 		$sign=0;
+	    } elsif (m/^--new$/) {
+		$new_package=1;
 	    } elsif (m/^--(\w+)=(.*)/s && ($om = $opts_opt_map{$1})) {
 		$om->[0] = $2;
 	    } elsif (m/^--(\w+):(.*)/s && ($om = $opts_opt_map{$1})) {
@@ -678,6 +694,8 @@ sub parseopts () {
 		} elsif (s/^-D/-/) {
 		    open DEBUG, ">&STDERR" or die $!;
 		    $debug++;
+		} elsif (s/^-N/-/) {
+		    $new_package=1;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, '-c', $1;
 		} elsif (s/^-C(.*)//s) {

@@ -115,6 +115,10 @@ Specifies that we should process source package
 rather than looking in debian/control or debian/changelog.
 Valid with dgit fetch and dgit pull, only.
 .TP
+.BR -N | --new
+The package may be new in this suite.  Without this, dgit will
+refuse to push.
+.TP
 .BI -D
 Prints debugging information to stderr.  Repeating the option produces
 more output (currently, up to -DD is meaningfully different).
