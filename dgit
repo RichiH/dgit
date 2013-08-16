@@ -57,10 +57,17 @@ our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-Git-Master';
 our $branchprefix = 'dgit';
 
-sub uploadbranch () { return "$branchprefix/$suite"; }
-sub lref ($) { return "refs/heads/$_[0]"; }
-sub rref ($) { return "refs/remotes/$remotename/$_[0]"; }
+sub lbranch () { return "$branchprefix/$suite"; }
+my $lbranch_re = '^refs/heads/'.$branchprefix.'/([^/.]+)$';
+sub lref () { return "refs/heads/".lbranch(); }
+sub lrref () { return "refs/remotes/$remotename/$suite"; }
+sub rrref () { return "refs/$branchprefix/$suite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
+
+sub fetchspec () {
+    local $suite = '*';
+    return  "+".rrref().":".lrref();
+}
 
 our $ua;
 
@@ -69,7 +76,7 @@ sub url_get {
 	$ua = LWP::UserAgent->new();
 	$ua->env_proxy;
     }
-    print "fetching @_...\n";
+    print "downloading @_...\n";
     my $r = $ua->get(@_) or die $!;
     die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
     return $r->decoded_content();
@@ -275,8 +282,8 @@ $clogp->{Changes}
 # imported by dgit from the archive
 END
     close C or die $!;
-    print "synthesised git commit from .dsc $clogp->{Version}\n";
     my $commithash = cmdoutput @git, qw(hash-object -w -t commit ../commit.tmp);
+    print "synthesised git commit from .dsc $clogp->{Version}\n";
     chdir '../../../..' or die $!;
     cmdoutput @git, qw(update-ref -m),"dgit synthesise $clogp->{Version}",
               'DGIT_ARCHIVE', $commithash;
@@ -338,12 +345,25 @@ sub is_fast_fwd ($$) {
     return rev_parse($mb) eq rev_parse($ancestor);
 }
 
+sub git_fetch_us () {
+    runcmd_ordryrun @git, qw(fetch),$remotename,fetchspec();
+}
+
 sub fetch_from_archive () {
-    # ensures that rref(uploadbranch()) is what is actually in the archive,
+    # ensures that lrref() is what is actually in the archive,
     #  one way or another
-    my $upload_ref = rref(uploadbranch());
+    get_archive_dsc();
+    $dsc_hash = $dsc->{$ourdscfield};
+    if (defined $dsc_hash) {
+	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
+	$dsc_hash = $&;
+	print "last upload to archive specified git hash\n";
+    } else {
+	print "last upload to archive has NO git hash\n";
+    }
+
     $!=0; $upload_hash =
-	cmdoutput_errok @git, qw(show-ref --heads), $upload_ref;
+	cmdoutput_errok @git, qw(show-ref --heads), lrref();
     die $! if $!;
     die $? unless ($?==0 && chomp $upload_hash) 
 	or ($?==256 && !length $upload_hash);
@@ -363,7 +383,7 @@ sub fetch_from_archive () {
 	    unless is_fast_fwd($dsc_hash, $upload_hash);
     }
     if ($upload_hash ne $hash) {
-	my @upd_cmd = (@git, qw(update-ref -m), 'dgit fetch', $upload_ref, $hash);
+	my @upd_cmd = (@git, qw(update-ref -m), 'dgit fetch', lrref(), $hash);
 	if (!$dryrun) {
 	    cmdoutput @upd_cmd;
 	} else {
@@ -375,45 +395,29 @@ sub fetch_from_archive () {
 sub clone ($) {
     my ($dstdir) = @_;
     die "dry run makes no sense with clone" if $dryrun;
-    get_archive_dsc();
-    $dsc_hash = $dsc->{$ourdscfield};
-    if (defined $dsc_hash) {
-	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
-	$dsc_hash = $&;
-	print "last upload to archive specified git hash\n";
-    } else {
-	print "last upload to archive has NO git hash\n";
-    }
-    my $branch = uploadbranch();
+    mkdir $dstdir or die "$dstdir $!";
+    chdir "$dstdir" or die "$dstdir $!";
+    runcmd @git, qw(init -q);
+    runcmd @git, qw(config), "remote.$remotename.fetch", fetchspec();
+    open H, "> .git/HEAD" or die $!;
+    print H "ref: ".lref()."\n" or die $!;
+    close H or die $!;
+    runcmd @git, qw(remote add), 'origin', "$alioth_git/$package.git";
     if (check_for_git()) {
-	print "cloning existing git history\n";
-	runcmd @git, qw(clone --origin),$remotename, qw(-b), $branch, '--',
-	    "$alioth_git/$package.git", $dstdir;
-	chdir "$dstdir" or die "$dstdir $!";
-	fetch_from_archive();
-	runcmd @git, qw(reset --hard), rref(uploadbranch());
+	print "fetching existing git history\n";
+	git_fetch_us();
+	runcmd @git, qw(fetch origin);
     } else {
 	print "starting new git history\n";
-	mkdir $dstdir or die "$dstdir $!";
-	chdir "$dstdir" or die "$dstdir $!";
-	runcmd @git, qw(init -q);
-	open H, "> .git/HEAD" or die $!;
-	print H "ref: ".lref(uploadbranch())."\n" or die $!;
-	close H or die $!;
-	runcmd @git, qw(remote add), $remotename, "$alioth_git/$package.git";
-	runcmd "git config branch.$branch.remote $remotename";
-	runcmd "git config branch.$branch.merge ".lref(uploadbranch());
-	my $newhash = generate_commit_from_dsc();
-	runcmd @git, qw(reset --hard), $newhash;
     }
+    fetch_from_archive();
+    runcmd @git, qw(reset --hard), lrref();
     print "ready for work in $dstdir\n";
 }
 
 sub fetch () {
-    get_archive_dsc();
     if (check_for_git()) {
-	runcmd_ordryrun @git, qw(fetch -p),$remotename,
-	    '+refs/heads/*:refs/remotes/origin/*';
+	git_fetch_us();
     }
     fetch_from_archive();
 }
@@ -421,7 +425,7 @@ sub fetch () {
 sub pull () {
     fetch();
     runcmd_ordryrun @git, qw(merge -m),"Merge from $suite [dgit]",
-        lref(uploadbranch());
+        lrref();
 }
 
 sub dopush () {
@@ -465,7 +469,7 @@ sub dopush () {
 	    " cd $package.git;".
 	    " if ! test -d objects; then git init --bare; fi";
     }
-    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".lref(uploadbranch());
+    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".rrref();
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
 		       "Release $dsc->{Version} for $suite [dgit]");
@@ -501,7 +505,7 @@ sub cmd_clone {
 sub branchsuite () {
     my $branch = cmdoutput_errok @git, qw(symbolic-ref HEAD);
     chomp $branch;
-    if ($branch =~ m#^refs/heads/$branchprefix/([^/.]+)$#o) {
+    if ($branch =~ m#$lbranch_re#o) {
 	return $1;
     } else {
 	return undef;
@@ -553,7 +557,7 @@ sub cmd_build {
     canonicalise_suite();
     runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
-            "--git-debian-branch=".uploadbranch(),
+            "--git-debian-branch=".lbranch(),
             @ARGV;
 }
 

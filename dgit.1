@@ -33,7 +33,9 @@ and
 .B dgit fetch
 consult the archive and dgit-repos and fetch and/or construct the
 git view of the history.  With clone, the destination directory (by
-default, the package name in the current directory) will be created.
+default, the package name in the current directory) will be created,
+and the new directory's `origin' remote will be set up to point to
+the package's dgit-repos tree.
 
 .B dgit build
 runs
@@ -54,12 +56,21 @@ archive.
 You may use any suitable git workflow with dgit, provided you
 satisfy dgit's requirements:
 
+dgit maintains what looks a bit like a remote called
+.BR dgit ,
+with one branch per suite.  This remote cannot be used with
+plain git.
+
 The
 .B dgit-repos
-repository for each package contains one branch per suite named
-\fBdgit/\fR\fIsuite\fR.  These should be pushed to only by
+repository for each package contains one ref per suite named
+\fBdrefs/git/\fR\fIsuite\fR.  These should be pushed to only by
 dgit.  They are fast forwarding.  Each push on this branch
 corresponds to an upload (or attempted upload).
+
+However, it is perfectly fine to have other branches in dgit-repos;
+normally the dgit-repos repo for the package will be accessible via
+the remote name `origin'.
 
 dgit push can operate on any commit which is a descendant of the
 current dgit/suite tip in dgit-repos.
