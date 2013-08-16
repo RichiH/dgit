@@ -1,0 +1,9 @@
+remote is dgit
+  can do fetch thing?
+  push is deliberately broken?
+
+remote refs
+  refs/dgit/<suite>
+local refs
+  refs/heads/<suite>
+  refs/remotes/dgit/<suite>

@@ -102,6 +102,7 @@ sub runcmd {
 }
 
 sub cmdoutput_errok {
+    die Dumper(\@_)." ?" if grep { !defined } @_;
     printcmd(\*DEBUG,"|",@_);
     open P, "-|", @_ or die $!;
     my $d;
@@ -133,6 +134,7 @@ sub runcmd_ordryrun {
 
 our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit.default.username' => '',
+	       'dgit.default.ssh' => 'ssh',
 	       'dgit-distro.debian.git-host' => 'git.debian.org',
 	       'dgit-distro.debian.git-proto' => 'git+ssh://',
 	       'dgit-distro.debian.git-path' => '/git/dgit-repos',
@@ -141,7 +143,7 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 
 sub cfg {
     foreach my $c (@_) {
-	my $v = cmdoutput_errok qw(git config --), $c;
+	my $v = cmdoutput_errok(qw(git config --), $c);
 	if ($?==0) {
 	    chomp $v;
 	    return $v;
@@ -157,7 +159,7 @@ sub cfg {
 sub access_cfg ($) {
     my ($key) = @_;
     my $distro = cfg("dgit-suite.$suite.distro",
-		     "dgit.default.distro"); });
+		     "dgit.default.distro");
     my $value = cfg("dgit-distro.$distro.$key",
 		    "dgit.default.$key");
     return $value;
@@ -169,13 +171,15 @@ sub access_gituserhost () {
     return defined($user) && length($user) ? "$user\@$host" : $host;
 }
 
-sub access_giturl () {
+sub access_giturl ($) {
     my $url = access_cfg('git-url');
-    return $url if defined $url;
-    return
-	access_cfg('git-proto').
-	access_gituserhost().
-	access_cfg('git-path');
+    if (!defined $url) {
+	$url =
+	    access_cfg('git-proto').
+	    access_gituserhost().
+	    access_cfg('git-path');
+    }
+    return "$url/package.git";
 }	       
 
 sub parsecontrol {
@@ -233,15 +237,12 @@ sub get_archive_dsc () {
 
 sub check_for_git () {
     # returns 0 or 1
-    my $how = access_config('git-check');
+    my $how = access_cfg('git-check');
     if ($how eq 'ssh-cmd') {
-	my $r= cmd_getoutput access_cfg('ssh'),access_gituserhost(),
-	    " set -e; cd ".access_cfg('git-path').";".
-	    " if test -d $package.git; then echo 1; else echo 0; fi";
-	print DEBUG "$cmd\n";
-	open P, "$cmd |" or die $!;
-	$!=0; $?=0;
-	my $r = <P>; close P;
+	my $r= cmdoutput
+	    (access_cfg('ssh'),access_gituserhost(),
+	     " set -e; cd ".access_cfg('git-path').";".
+	     " if test -d $package.git; then echo 1; else echo 0; fi");
 	print DEBUG ">$r<\n";
 	die "$r $! $?" unless $r =~ m/^[01]$/;
 	return $r+0;
@@ -251,13 +252,14 @@ sub check_for_git () {
 }
 
 sub create_remote_git_repo () {
-    my $how = access_config('git-create');
+    my $how = access_cfg('git-create');
     if ($how eq 'ssh-cmd') {
-	runcmd_ordryrun access_cfg('ssh'),access_gituserhost(),
-	    "set -e; cd ".access_cfg('git-path').";".
-	    " mkdir -p $package.git;".
-	    " cd $package.git;".
-	    " if ! test -d objects; then git init --bare; fi";
+	runcmd_ordryrun
+	    (access_cfg('ssh'),access_gituserhost(),
+	     "set -e; cd ".access_cfg('git-path').";".
+	     " mkdir -p $package.git;".
+	     " cd $package.git;".
+	     " if ! test -d objects; then git init --bare; fi");
     } else {
 	die "unknown git-create $how ?";
     }
@@ -423,10 +425,13 @@ sub fetch_from_archive () {
 
     $!=0; $upload_hash =
 	cmdoutput_errok @git, qw(show-ref --heads), lrref();
-    die $! if $!;
-    die $? unless ($?==0 && chomp $upload_hash) 
-	or ($?==256 && !length $upload_hash);
-    $upload_hash ||= '';
+    if ($?==0) {
+	die unless chomp $upload_hash;
+    } elsif ($?==256) {
+	$upload_hash = '';
+    } else {
+	die $?;
+    }
     my $hash;
     if (defined $dsc_hash) {
 	die "missing git history even though dsc has hash"
