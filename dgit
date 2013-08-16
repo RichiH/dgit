@@ -171,7 +171,7 @@ sub access_gituserhost () {
     return defined($user) && length($user) ? "$user\@$host" : $host;
 }
 
-sub access_giturl ($) {
+sub access_giturl () {
     my $url = access_cfg('git-url');
     if (!defined $url) {
 	$url =
@@ -179,7 +179,7 @@ sub access_giturl ($) {
 	    access_gituserhost().
 	    access_cfg('git-path');
     }
-    return "$url/package.git";
+    return "$url/$package.git";
 }	       
 
 sub parsecontrol {
@@ -407,7 +407,7 @@ sub is_fast_fwd ($$) {
 
 sub git_fetch_us () {
     die "cannot dry run with fetch" if $dryrun;
-    runcmd @git, qw(fetch),$remotename,fetchspec();
+    runcmd @git, qw(fetch),access_giturl(),fetchspec();
 }
 
 sub fetch_from_archive () {
@@ -466,7 +466,7 @@ sub clone ($) {
     open H, "> .git/HEAD" or die $!;
     print H "ref: ".lref()."\n" or die $!;
     close H or die $!;
-    runcmd @git, qw(remote add), 'origin', access_giturl($package);
+    runcmd @git, qw(remote add), 'origin', access_giturl();
     if (check_for_git()) {
 	print "fetching existing git history\n";
 	git_fetch_us();
@@ -495,7 +495,6 @@ sub pull () {
 sub dopush () {
     runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
-    die if defined $package;
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
     stat "../$dscfn" or die "$dscfn $!";
@@ -530,7 +529,7 @@ sub dopush () {
     if (!check_for_git()) {
 	create_remote_git_repo();
     }
-    runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".rrref();
+    runcmd_ordryrun @git, qw(push),access_giturl(),"HEAD:".rrref();
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
 		       "Release $dsc->{Version} for $suite [dgit]");
@@ -542,7 +541,7 @@ sub dopush () {
 	push @debsign_cmd, $changesfile;
 	runcmd_ordryrun @debsign_cmd;
     }
-    runcmd_ordryrun @git, qw(push),$remotename,"refs/tags/$tag";
+    runcmd_ordryrun @git, qw(push),access_giturl(),"refs/tags/$tag";
     runcmd_ordryrun @dput, $changesfile;
 }
 
