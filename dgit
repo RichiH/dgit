@@ -26,7 +26,6 @@ use Dpkg::Control::Hash;
 use File::Path;
 use POSIX;
 
-our $mirror = 'http://mirror.relativity.greenend.org.uk/mirror/debian-ftp/';
 our $suite = 'sid';
 our $package;
 
@@ -139,7 +138,8 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit-distro.debian.git-proto' => 'git+ssh://',
 	       'dgit-distro.debian.git-path' => '/git/dgit-repos',
 	       'dgit-distro.debian.git-check' => 'ssh-cmd',
-	       'dgit-distro.debian.git-create' => 'ssh-cmd');
+	       'dgit-distro.debian.git-create' => 'ssh-cmd',
+	       'dgit-distro.debian.mirror' => 'http://ftp.debian.org/debian/');
 
 sub cfg {
     foreach my $c (@_) {
@@ -224,7 +224,8 @@ sub get_archive_dsc () {
     my $vsn = askmadison();
     # fixme madison does not show us the component
     my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
-    $dscurl = "$mirror/pool/main/$prefix/$package/${package}_$vsn.dsc";
+    $dscurl = access_cfg('mirror').
+	"/pool/main/$prefix/$package/${package}_$vsn.dsc";
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
     print DEBUG Dumper($dscdata);
