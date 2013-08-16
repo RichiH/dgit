@@ -346,7 +346,8 @@ sub is_fast_fwd ($$) {
 }
 
 sub git_fetch_us () {
-    runcmd_ordryrun @git, qw(fetch),$remotename,fetchspec();
+    die "cannot dry run with fetch" if $dryrun;
+    runcmd @git, qw(fetch),$remotename,fetchspec();
 }
 
 sub fetch_from_archive () {

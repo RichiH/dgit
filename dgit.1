@@ -95,9 +95,7 @@ the remote tracking branch for dgit/suite.
 .TP
 .BR --dry-run | -n
 Go through the motions, fetching all information needed, but do not
-actually update the output(s).  For fetch and pull, dgit determines
-which git commit corresponds to the archive but does not update
-remotes/dgit/dgit/suite or do any merge.  For push, dgit does
+actually update the output(s).  For push, dgit does
 the required checks and leaves the new .dsc in a temporary file,
 but does not sign, tag, push or upload.
 .TP
@@ -167,3 +165,6 @@ The error messages are often unhelpfully terse and tend to refer to
 line numbers in dgit.
 
 The option parser requires values to be cuddled to the option name.
+
+--dry-run often does not work with fetch, even though this is a
+logically plausible request.  (It fails, instead.)

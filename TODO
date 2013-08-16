@@ -1,5 +1,3 @@
-abolish fetch dry run
-
 config for repo locations
 
 push should push to dgit remote (other branches)
