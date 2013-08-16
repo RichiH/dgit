@@ -372,7 +372,8 @@ sub fetch_from_archive () {
     }
 }
 
-sub clone () {
+sub clone ($) {
+    my ($dstdir) = @_;
     die "dry run makes no sense with clone" if $dryrun;
     get_archive_dsc();
     $dsc_hash = $dsc->{$ourdscfield};
@@ -383,7 +384,6 @@ sub clone () {
     } else {
 	print "last upload to archive has NO git hash\n";
     }
-    my $dstdir = "$package";
     my $branch = uploadbranch();
     if (check_for_git()) {
 	print "cloning existing git history\n";
@@ -482,14 +482,20 @@ sub dopush () {
 }
 
 sub cmd_clone {
+    my $dstdir;
     if (@ARGV==1) {
 	($package) = @ARGV;
-    } elsif (@ARGV==2) {
+    } elsif (@ARGV==2 && $ARGV[1] =~ m#^\w#) {
 	($package,$suite) = @ARGV;
+    } elsif (@ARGV==2 && $ARGV[1] =~ m#^[./]#) {
+	($package,$dstdir) = @ARGV;
+    } elsif (@ARGV==3) {
+	($package,$suite,$dstdir) = @ARGV;
     } else {
 	die;
     }
-    clone();
+    $dstdir ||= "$package";
+    clone($dstdir);
 }
 
 sub branchsuite () {

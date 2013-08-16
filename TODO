@@ -1,5 +1,3 @@
-clone support for output dir spec.
-
 config for repo locations
 
 push should push to dgit remote (other branches)
