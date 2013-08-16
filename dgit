@@ -39,6 +39,8 @@ our $aliothpath = '/git/dgit-repos';
 our $alioth_git = "git+ssh://$aliothname/$aliothpath";
 our $alioth_sshtestbodge = [$aliothname,$aliothpath];
 
+our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
+
 our (@git) = qw(git);
 our (@dget) = qw(dget);
 our (@dput) = qw(dput);
@@ -177,7 +179,7 @@ sub get_archive_dsc () {
     $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
     print DEBUG Dumper($dsc);
     my $fmt = $dsc->{Format};
-    die "unsupported format $fmt, sorry\n" unless $fmt eq '1.0';
+    die "unsupported format $fmt, sorry\n" unless $format_ok{$fmt};
 }
 
 sub check_for_git () {
@@ -233,7 +235,7 @@ sub dsc_files () {
 
 sub is_orig_file ($) {
     local ($_) = @_;
-    m/\.orig\.tar\.\w+$/;
+    m/\.orig(?:-\w+)?\.tar\.\w+$/;
 }
 
 sub generate_commit_from_dsc () {
