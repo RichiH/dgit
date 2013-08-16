@@ -209,7 +209,7 @@ sub parsechangelog {
     return $c;
 }
 
-our $rmad;
+our %rmad;
 
 sub archive_query () {
     my $query = access_cfg('archive-query');
@@ -218,13 +218,15 @@ sub archive_query () {
     my $proto = $1;
     my $url = $'; #';
     die unless $proto eq 'madison';
-    $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite","-u$url",$package;
+    $rmad{$package} ||= cmdoutput
+	qw(rmadison -asource),"-s$suite","-u$url",$package;
+    my $rmad = $rmad{$package};
     if (!length $rmad) {
 	return ();
     }
     $rmad =~ m{^ \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
-                 \s*( [^ \t|/]+ )(?:/([^ \t|/]+)) \s* \|
+                 \s*( [^ \t|/]+ )(?:/([^ \t|/]+))? \s* \|
                  \s*( [^ \t|]+ )\s* }x or die "$rmad $?";
     $1 eq $package or die "$rmad $package ?";
     my $vsn = $2;
