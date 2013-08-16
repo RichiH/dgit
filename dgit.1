@@ -166,19 +166,14 @@ on the dgit command line.
 .TP
 .BI dgit-distro. distro .archive-query
 .TP
+.BI dgit-distro. distro .archive-query-default-component
+.TP
 .BI dgit-distro. distro .ssh
 .TP
 .BR dgit.default. *
 for each
 .BR dgit-distro. \fIdistro\fR . *
 .SH BUGS
-dgit will only work with packages in main. The madison http query API
-does not give the component.
-
-dgit assumes knowledge of the archive layout.  There appears to be no
-sane way to find the path in the archive pool of the .dsc for a
-particular suite.
-
 We should be using some kind of vhost/vpath setup for the git repos on
 alioth, so that they can be moved later if and when this turns out to
 be a good idea.
@@ -220,6 +215,11 @@ The error messages are often unhelpfully terse and tend to refer to
 line numbers in dgit.
 
 The option parser requires values to be cuddled to the option name.
+
+dgit assumes knowledge of the archive layout.  There appears to be no
+sane way to find the path in the archive pool of the .dsc for a
+particular suite.  I'm assured that the archive layout is a
+`well known algorithm' by now.
 
 --dry-run often does not work with fetch, even though this is a
 logically plausible request.  (It fails, instead.)

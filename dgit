@@ -134,6 +134,7 @@ sub runcmd_ordryrun {
 
 our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit.default.username' => '',
+	       'dgit.default.archive-query-default-component' => 'main',
 	       'dgit.default.ssh' => 'ssh',
 	       'dgit-distro.debian.git-host' => 'git.debian.org',
 	       'dgit-distro.debian.git-proto' => 'git+ssh://',
@@ -216,10 +217,10 @@ sub archive_query () {
     my $url = $'; #';
     die unless $proto eq 'madison';
     $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite","-u$url",$package;
-    $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
+    $rmad =~ m{^ \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
-                 \s*( [^ \t|]+ )\s* \|
-                 \s*( [^ \t|]+ )\s* /x or die "$rmad $?";
+                 \s*( [^ \t|/]+ )(?:/([^ \t|/]+)) \s* \|
+                 \s*( [^ \t|]+ )\s* }x or die "$rmad $?";
     $1 eq $package or die "$rmad $package ?";
     my $vsn = $2;
     if ($suite ne $3) {
@@ -227,9 +228,15 @@ sub archive_query () {
 	print "canonical suite name for $suite is $3\n";
 	$suite = $3;
     }
-    $4 eq 'source' or die "$rmad ?";
+    my $component;
+    if (defined $4) {
+	$component = $4;
+    } else {
+	$component = access_cfg('archive-query-default-component');
+    }
+    $5 eq 'source' or die "$rmad ?";
     my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
-    my $subpath = "/pool/main/$prefix/$package/${package}_$vsn.dsc";
+    my $subpath = "/pool/$component/$prefix/$package/${package}_$vsn.dsc";
     return ($vsn,$subpath);
 }
 
