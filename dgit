@@ -34,11 +34,6 @@ our $sign = 1;
 our $dryrun = 0;
 our $changesfile;
 
-our $aliothname = 'iwj@git.debian.org';
-our $aliothpath = '/git/dgit-repos';
-our $alioth_git = "git+ssh://$aliothname/$aliothpath";
-our $alioth_sshtestbodge = [$aliothname,$aliothpath];
-
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
 our (@git) = qw(git);
@@ -136,6 +131,53 @@ sub runcmd_ordryrun {
     }
 }
 
+our %defcfg = ('dgit.default.distro' => 'debian',
+	       'dgit.default.username' => '',
+	       'dgit-distro.debian.git-host' => 'git.debian.org',
+	       'dgit-distro.debian.git-proto' => 'git+ssh://',
+	       'dgit-distro.debian.git-path' => '/git/dgit-repos',
+	       'dgit-distro.debian.git-check' => 'ssh-cmd',
+	       'dgit-distro.debian.git-create' => 'ssh-cmd');
+
+sub cfg {
+    foreach my $c (@_) {
+	my $v = cmdoutput_errok qw(git config --), $c;
+	if ($?==0) {
+	    chomp $v;
+	    return $v;
+	} elsif ($?!=256) {
+	    die "$c $?";
+	}
+	my $dv = $defcfg{$c};
+	return $dv if defined $dv;
+    }
+    return undef;
+}
+
+sub access_cfg ($) {
+    my ($key) = @_;
+    my $distro = cfg("dgit-suite.$suite.distro",
+		     "dgit.default.distro"); });
+    my $value = cfg("dgit-distro.$distro.$key",
+		    "dgit.default.$key");
+    return $value;
+}
+
+sub access_gituserhost () {
+    my $user = access_cfg('git-user');
+    my $host = access_cfg('git-host');
+    return defined($user) && length($user) ? "$user\@$host" : $host;
+}
+
+sub access_giturl () {
+    my $url = access_cfg('git-url');
+    return $url if defined $url;
+    return
+	access_cfg('git-proto').
+	access_gituserhost().
+	access_cfg('git-path');
+}	       
+
 sub parsecontrol {
     my $c = Dpkg::Control::Hash->new();
     $c->load(@_) or return undef;
@@ -191,18 +233,34 @@ sub get_archive_dsc () {
 
 sub check_for_git () {
     # returns 0 or 1
-    my $cmd= 
-	"ssh $alioth_sshtestbodge->[0] '".
-	" set -e; cd $alioth_sshtestbodge->[1];".
-	" if test -d $package.git; then echo 1; else echo 0; fi".
-	"'";
-    print DEBUG "$cmd\n";
-    open P, "$cmd |" or die $!;
-    $!=0; $?=0;
-    my $r = <P>; close P;
-    print DEBUG ">$r<\n";
-    die "$r $! $?" unless $r =~ m/^[01]$/;
-    return $r+0;
+    my $how = access_config('git-check');
+    if ($how eq 'ssh-cmd') {
+	my $r= cmd_getoutput access_cfg('ssh'),access_gituserhost(),
+	    " set -e; cd ".access_cfg('git-path').";".
+	    " if test -d $package.git; then echo 1; else echo 0; fi";
+	print DEBUG "$cmd\n";
+	open P, "$cmd |" or die $!;
+	$!=0; $?=0;
+	my $r = <P>; close P;
+	print DEBUG ">$r<\n";
+	die "$r $! $?" unless $r =~ m/^[01]$/;
+	return $r+0;
+    } else {
+	die "unknown git-check $how ?";
+    }
+}
+
+sub create_remote_git_repo () {
+    my $how = access_config('git-create');
+    if ($how eq 'ssh-cmd') {
+	runcmd_ordryrun access_cfg('ssh'),access_gituserhost(),
+	    "set -e; cd ".access_cfg('git-path').";".
+	    " mkdir -p $package.git;".
+	    " cd $package.git;".
+	    " if ! test -d objects; then git init --bare; fi";
+    } else {
+	die "unknown git-create $how ?";
+    }
 }
 
 our ($dsc_hash,$upload_hash);
@@ -403,7 +461,7 @@ sub clone ($) {
     open H, "> .git/HEAD" or die $!;
     print H "ref: ".lref()."\n" or die $!;
     close H or die $!;
-    runcmd @git, qw(remote add), 'origin', "$alioth_git/$package.git";
+    runcmd @git, qw(remote add), 'origin', access_giturl($package);
     if (check_for_git()) {
 	print "fetching existing git history\n";
 	git_fetch_us();
@@ -465,11 +523,7 @@ sub dopush () {
     }
     my $tag = debiantag($dsc->{Version});
     if (!check_for_git()) {
-	runcmd_ordryrun qw(ssh),$alioth_sshtestbodge->[0],
-	"set -e; cd $alioth_sshtestbodge->[1];".
-	    " mkdir -p $package.git;".
-	    " cd $package.git;".
-	    " if ! test -d objects; then git init --bare; fi";
+	create_remote_git_repo();
     }
     runcmd_ordryrun @git, qw(push),$remotename,"HEAD:".rrref();
     if ($sign) {

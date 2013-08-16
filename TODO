@@ -1,9 +1,3 @@
-config for repo locations
-
-Archive agility.  Archive needs to specify (a) way to get versions
-and paths in archive for dscs (b) unpriv pull location (c) priv
-push location
-
 Vcs-Git-Master: <commit>
   specifies commit hash corresponding to the thing uploaded
   optional commit hash corresponding to pristine tar??

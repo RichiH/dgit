@@ -133,12 +133,37 @@ debsign.  Use repeatedly if multiple additional options are required.
 Specifies the .changes file which is to be uploaded.  By default
 dgit push looks for single .changes file in the parent directory whose
 filename suggests they it is for the right package and version.
+.SH CONFIGURATION
+dgit looks at the following git config keys to control its behaviour.
+You may set them with git-config (either in system-global or per-tree
+configuration), or provide
+.BI -c key = value
+on the dgit command line.
+.TP
+.BI dgit-suite. suite .distro
+.TP
+.BI dgit.default.distro
+.TP
+.BI dgit.default.username
+.TP
+.BI dgit-distro. distro .git-url
+.TP
+.BI dgit-distro. distro .git-host
+.TP
+.BI dgit-distro. distro .git-proto
+.TP
+.BI dgit-distro. distro .git-path
+.TP
+.BI dgit-distro. distro .git-check
+.TP
+.BI dgit-distro. distro .git-create
+.TP
+.BI dgit-distro. distro .ssh
+.TP
+.BR dgit.default. *
+for each
+.BR dgit-distro. \fIdistro\fR . *
 .SH BUGS
-dgit is not nearly configurable enough.  The locations for dgit-repos
-(on alioth) and for the Debian archive are currently hardcoded.
-There is not yet any support for suites which are in different
-distributions to Debian.
-
 dgit will only work with packages in main. The madison http query API
 does not give the component.
 
