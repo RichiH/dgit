@@ -139,6 +139,13 @@ dgit assumes knowledge of the archive layout.  There appears to be no
 sane way to find the path in the archive pool of the .dsc for a
 particular suite.
 
+Debian Policy needs to be updated to describe the new Vcs-Git-Master
+field (and to specify that it is an RC bug for that field to refer
+to an unavailable commit).
+
+dgit push should perhaps do `git push origin', or something similar,
+by default.
+
 The mechanism for checking for and creating per-package repos on
 alioth is a hideous bodge.  One consequence is that dgit currently
 only works for people with push access.
