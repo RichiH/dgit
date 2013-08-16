@@ -432,6 +432,7 @@ sub pull () {
 sub dopush () {
     runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
+    die if defined $package;
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
     stat "../$dscfn" or die "$dscfn $!";
@@ -488,6 +489,7 @@ sub dopush () {
 
 sub cmd_clone {
     my $dstdir;
+    die if defined $package;
     if (@ARGV==1) {
 	($package) = @ARGV;
     } elsif (@ARGV==2 && $ARGV[1] =~ m#^\w#) {
@@ -514,11 +516,16 @@ sub branchsuite () {
 }
 
 sub fetchpullargs () {
-    my $clogp = parsechangelog();
-    $package = $clogp->{Source};
+    if (!defined $package) {
+	my $sourcep = parsecontrol('debian/control');
+	$package = $sourcep->{Source};
+    }
     if (@ARGV==0) {
 	$suite = branchsuite();
-	$suite ||= $clogp->{Distribution};
+	if (!$suite) {
+	    my $clogp = parsechangelog();
+	    $suite = $clogp->{Distribution};
+	}
 	canonicalise_suite();
 	print "fetching from suite $suite\n";
     } elsif (@ARGV==1) {
@@ -540,6 +547,7 @@ sub cmd_pull {
 }
 
 sub cmd_push {
+    die if defined $package;
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     if (@ARGV==0) {
@@ -552,6 +560,7 @@ sub cmd_push {
 }
 
 sub cmd_build {
+    die if defined $package;
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
     $package = $clogp->{Source};

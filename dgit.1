@@ -107,6 +107,13 @@ for signing the tag and the upload.
 .BR --no-sign
 does not sign tags or uploads (meaningful only with push).
 .TP
+.TP
+.BI -p package
+Specifies that we should process source package
+.I package
+rather than looking in debian/control.  Valid with dgit fetch
+and dgit pull, only.
+.TP
 .BI -D
 Spew debugging information to stderr.
 .TP
