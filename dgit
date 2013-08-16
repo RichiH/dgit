@@ -146,8 +146,7 @@ sub cfg {
     foreach my $c (@_) {
 	my $v;
 	{
-	    my $d2 = $debug-1;
-	    local ($debug) = $d2;
+	    local ($debug) = $debug-1;
 	    $v = cmdoutput_errok(@git, qw(config --), $c);
 	};
 	if ($?==0) {
