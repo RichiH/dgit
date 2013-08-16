@@ -156,10 +156,14 @@ sub cfg {
     return undef;
 }
 
+sub access_distro () {
+    return cfg("dgit-suite.$suite.distro",
+	       "dgit.default.distro");
+}
+
 sub access_cfg ($) {
     my ($key) = @_;
-    my $distro = cfg("dgit-suite.$suite.distro",
-		     "dgit.default.distro");
+    my $distro = access_distro();
     my $value = cfg("dgit-distro.$distro.$key",
 		    "dgit.default.$key");
     return $value;
@@ -199,8 +203,14 @@ sub parsechangelog {
 
 our $rmad;
 
-sub askmadison () {
-    $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite",$package;
+sub archive_query () {
+    my $query = access_cfg('archive-query');
+    $query ||= "madison:".access_distro();
+    $query =~ s/^(\w+):// or die "$query ?";
+    my $proto = $1;
+    my $url = $'; #';
+    die unless $proto eq 'madison';
+    $rmad ||= cmdoutput qw(rmadison -asource),"-s$suite","-u$url",$package;
     $rmad =~ m/^ \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
                  \s*( [^ \t|]+ )\s* \|
@@ -213,19 +223,19 @@ sub askmadison () {
 	$suite = $3;
     }
     $4 eq 'source' or die "$rmad ?";
-    return $vsn;
+    my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
+    my $subpath = "/pool/main/$prefix/$package/${package}_$vsn.dsc";
+    return ($vsn,$subpath);
 }
 
 sub canonicalise_suite () {
-    askmadison();
+    archive_query();
 }
 
 sub get_archive_dsc () {
-    my $vsn = askmadison();
+    my ($vsn,$subpath) = archive_query();
     # fixme madison does not show us the component
-    my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
-    $dscurl = access_cfg('mirror').
-	"/pool/main/$prefix/$package/${package}_$vsn.dsc";
+    $dscurl = access_cfg('mirror').$subpath;
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
     print DEBUG Dumper($dscdata);
