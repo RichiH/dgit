@@ -41,6 +41,7 @@ our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
 our $keyid;
 
+our $debug = 0;
 open DEBUG, ">/dev/null" or die $!;
 
 our %opts_opt_map = ('dget' => \@dget,
@@ -95,14 +96,14 @@ sub printcmd {
 }
 
 sub runcmd {
-    printcmd(\*DEBUG,"+",@_);
+    printcmd(\*DEBUG,"+",@_) if $debug>0;
     $!=0; $?=0;
     die "@_ $! $?" if system @_;
 }
 
 sub cmdoutput_errok {
     die Dumper(\@_)." ?" if grep { !defined } @_;
-    printcmd(\*DEBUG,"|",@_);
+    printcmd(\*DEBUG,"|",@_) if $debug>0;
     open P, "-|", @_ or die $!;
     my $d;
     $!=0; $?=0;
@@ -143,7 +144,12 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 
 sub cfg {
     foreach my $c (@_) {
-	my $v = cmdoutput_errok(@git, qw(config --), $c);
+	my $v;
+	{
+	    my $d2 = $debug-1;
+	    local ($debug) = $d2;
+	    $v = cmdoutput_errok(@git, qw(config --), $c);
+	};
 	if ($?==0) {
 	    chomp $v;
 	    return $v;
@@ -238,10 +244,10 @@ sub get_archive_dsc () {
     $dscurl = access_cfg('mirror').$subpath;
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
-    print DEBUG Dumper($dscdata);
+    print DEBUG Dumper($dscdata) if $debug>1;
     $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
     $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
-    print DEBUG Dumper($dsc);
+    print DEBUG Dumper($dsc) if $debug>1;
     my $fmt = $dsc->{Format};
     die "unsupported format $fmt, sorry\n" unless $format_ok{$fmt};
 }
@@ -254,7 +260,7 @@ sub check_for_git () {
 	    (access_cfg('ssh'),access_gituserhost(),
 	     " set -e; cd ".access_cfg('git-path').";".
 	     " if test -d $package.git; then echo 1; else echo 0; fi");
-	print DEBUG ">$r<\n";
+	print DEBUG "got \`$r'\n";
 	die "$r $! $?" unless $r =~ m/^[01]$/;
 	return $r+0;
     } else {
@@ -666,6 +672,7 @@ sub parseopts () {
 		    $dryrun=1;
 		} elsif (s/^-D/-/) {
 		    open DEBUG, ">&STDERR" or die $!;
+		    $debug++;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, '-c', $1;
 		} elsif (s/^-C(.*)//s) {
