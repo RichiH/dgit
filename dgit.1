@@ -139,6 +139,16 @@ debsign.  Use repeatedly if multiple additional options are required.
 Specifies the .changes file which is to be uploaded.  By default
 dgit push looks for single .changes file in the parent directory whose
 filename suggests it is for the right package and version.
+.TP
+.BI --existing-package= package
+dgit push needs to canonicalise the suite name.  But currently
+there is no way to ask the archive to do this without knowing the
+name of an existing package.  Without --new we can just use the
+package we are trying to push.  But with --new that will not work, so
+we guess that
+.B dpkg
+exists in the target suite.  If it doesn't, you can use this option to
+specify a package which does.  If the suite is empty, bad luck.
 .SH CONFIGURATION
 dgit looks at the following git config keys to control its behaviour.
 You may set them with git-config (either in system-global or per-tree
@@ -186,7 +196,9 @@ Debian Policy needs to be updated to describe the new Vcs-Dgit-Master
 field (and to specify that it is an RC bug for that field to refer
 to an unavailable commit).
 
-dgit cannot currently introduce a package into a suite.
+The method of canonicalising suite names is bizarre.  See the
+.B --existing-package
+option for one of the implication.s
 
 dgit push should perhaps do `git push origin', or something similar,
 by default.

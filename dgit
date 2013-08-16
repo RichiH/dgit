@@ -33,6 +33,7 @@ our $sign = 1;
 our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
+our $existing_package = 'dpkg';
 
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
@@ -245,7 +246,7 @@ sub archive_query () {
 }
 
 sub canonicalise_suite () {
-    archive_query();
+    archive_query() or die;
 }
 
 sub get_archive_dsc () {
@@ -645,7 +646,7 @@ sub cmd_push {
     if (@ARGV==0) {
 	$suite = $clogp->{Distribution};
 	if ($new_package) {
-	    local ($package) = 'dpkg';
+	    local ($package) = $existing_package; # this is a hack
 	    canonicalise_suite();
 	}
     } else {
@@ -665,7 +666,6 @@ sub cmd_build {
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
     $package = $clogp->{Source};
-    canonicalise_suite();
     runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
 	'--git-builder=dpkg-buildpackage -i\.git/ -I.git',
@@ -690,6 +690,8 @@ sub parseopts () {
 		$om->[0] = $2;
 	    } elsif (m/^--(\w+):(.*)/s && ($om = $opts_opt_map{$1})) {
 		push @$om, $2;
+	    } elsif (m/^--existing-package=(.*)/s) {
+		$existing_package = $1;
 	    } else {
 		die "$_ ?";
 	    }
