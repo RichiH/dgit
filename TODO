@@ -9,3 +9,14 @@ newly cloned repos should have suite branches marked not to push
 Archive agility.  Archive needs to specify (a) way to get versions
 and paths in archive for dscs (b) unpriv pull location (c) priv
 push location
+
+Policy: rc bugs for
+  server(s?) not reachable
+  mismatch
+
+Policy: New field in dsc
+  specifies
+    commit hash corresponding to the thing uploaded
+    optional commit hash corresponding to pristine tar
+ Vcs-git-master: <url>#commit
+
