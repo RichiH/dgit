@@ -1,8 +1,6 @@
 config for repo locations
 
 push should push to dgit remote (other branches)
-manpage should say not to push to suite branches
-newly cloned repos should have suite branches marked not to push
 
 Archive agility.  Archive needs to specify (a) way to get versions
 and paths in archive for dscs (b) unpriv pull location (c) priv
