@@ -57,7 +57,7 @@ archive.
 You may use any suitable git workflow with dgit, provided you
 satisfy dgit's requirements:
 
-dgit maintains what looks a bit like a remote called
+dgit maintains a pseudo-remote called
 .BR dgit ,
 with one branch per suite.  This remote cannot be used with
 plain git.
@@ -112,8 +112,8 @@ does not sign tags or uploads (meaningful only with push).
 .BI -p package
 Specifies that we should process source package
 .I package
-rather than looking in debian/control.  Valid with dgit fetch
-and dgit pull, only.
+rather than looking in debian/control or debian/changelog.
+Valid with dgit fetch and dgit pull, only.
 .TP
 .BI -D
 Prints debugging information to stderr.  Repeating the option produces
@@ -134,7 +134,7 @@ debsign.  Use repeatedly if multiple additional options are required.
 .BI -C changesfile
 Specifies the .changes file which is to be uploaded.  By default
 dgit push looks for single .changes file in the parent directory whose
-filename suggests they it is for the right package and version.
+filename suggests it is for the right package and version.
 .SH CONFIGURATION
 dgit looks at the following git config keys to control its behaviour.
 You may set them with git-config (either in system-global or per-tree
@@ -200,19 +200,21 @@ Debian Maintainers are currently not able to push, as there is not
 currently any mechanism for determining and honouring the archive's
 ideas about access control.  Currently only DDs can push.
 
-dgit's representation of format `3.0 (quilt)' source packages (even if
-they were supported) would not represent the patch stack.  Currently
-the patch series representation cannot round trip through the archive.
-Ideally dgit would represent a quilty package with an origin commit of
-some kind followed by the patch stack as a series of commits followed
-by a pseudo-merge (to make the branch fast-forwarding).  This would
-also mean a new `dgit rebase-prep' command or some such to turn such a
-fast-forwarding branch back into a rebasing patch stack, and a `force'
-option to dgit push (perhaps enabled automatically) which will make
-the required pseudo-merge.
+dgit's representation of format `3.0 (quilt)' source packages does not
+represent the patch stack.  Currently the patch series representation
+cannot round trip through the archive.  Ideally dgit would represent a
+quilty package with an origin commit of some kind followed by the
+patch stack as a series of commits followed by a pseudo-merge (to make
+the branch fast-forwarding).  This would also mean a new `dgit
+rebase-prep' command or some such to turn such a fast-forwarding
+branch back into a rebasing patch stack, and a `force' option to dgit
+push (perhaps enabled automatically by a note left by rebase-prep)
+which will make the required pseudo-merge.
 
 dgit's handling of .orig.tar.gz is not very sophisticated.  Ideally
 the .orig.tar.gz could be transported via the git repo as git tags.
+Doing this is made more complicated by the possibility of a `3.0
+(quilt)' package with multiple .orig tarballs.
 
 The error messages are often unhelpfully terse and tend to refer to
 line numbers in dgit.
