@@ -46,7 +46,7 @@ the generated source package corresponds to the relevant git commit.
 Tagging and signing should be left to dgit push.
 
 .B dgit push
-does an "upload", pushing the current HEAD to the archive (as a source
+does an `upload', pushing the current HEAD to the archive (as a source
 package) and to dgit-repos (as git commits).  This also involves
 making a signed git tag, and signing the files to be uploaded to the
 archive.
@@ -138,14 +138,14 @@ Debian Maintainers are currently not able to push, as there is not
 currently any mechanism for determining and honouring the archive's
 ideas about access control.  Currently only DDs can push.
 
-dgit's representation of Format 3.0 (quilt) source packages (even if
+dgit's representation of format `3.0 (quilt)' source packages (even if
 they were supported) would not represent the patch stack.  Currently
 the patch series representation cannot round trip through the archive.
 Ideally dgit would represent a quilty package with an origin commit of
 some kind followed by the patch stack as a series of commits followed
 by a pseudo-merge (to make the branch fast-forwarding).  This would
-also mean a new "dgit rebase-prep" command or some such to turn such a
-fast-forwarding branch back into a rebasing patch stack, and a "force"
+also mean a new `dgit rebase-prep' command or some such to turn such a
+fast-forwarding branch back into a rebasing patch stack, and a `force'
 option to dgit push (perhaps enabled automatically) which will make
 the required pseudo-merge.
 
