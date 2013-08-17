@@ -84,8 +84,9 @@ branch) whose tree is identical to the unpacked source upload.
 
 Uploads not made by dgit are represented in git by commits which are
 synthesised by dgit.  The tree of each such commit corresponds to the
-unpacked source; the single parent is the last known upload - that is,
-the contents of the dgit/suite branch.
+unpacked source; there is an origin commit with the contents, and a
+psuedo-merge from last known upload - that is, from the contents of
+the dgit/suite branch.
 
 dgit expects repos that it works with to have a
 .B dgit
