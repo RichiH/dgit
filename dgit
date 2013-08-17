@@ -734,6 +734,7 @@ sub cmd_build {
     my $clogp = parsechangelog();
     $suite = $clogp->{Distribution};
     $package = $clogp->{Source};
+    canonicalise_suite() unless grep { m/^--git-debian-branch/ } @ARGV;
     runcmd_ordryrun
 	qw(git-buildpackage -us -uc --git-no-sign-tags),
 	'--git-builder=dpkg-buildpackage -i\.git/ -I.git',
