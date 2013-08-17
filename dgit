@@ -785,12 +785,14 @@ sub cmd_build {
     my $clogp = parsechangelog();
     $isuite = $clogp->{Distribution};
     $package = $clogp->{Source};
-    canonicalise_suite() unless grep { m/^--git-debian-branch/ } @ARGV;
-    runcmd_ordryrun
-	qw(git-buildpackage -us -uc --git-no-sign-tags),
-	'--git-builder=dpkg-buildpackage -i\.git/ -I.git',
-	"--git-debian-branch=".lbranch(),
-	@ARGV;
+    my @cmd =
+	(qw(git-buildpackage -us -uc --git-no-sign-tags),
+	 '--git-builder=dpkg-buildpackage -i\.git/ -I.git');
+    unless (grep { m/^--git-debian-branch/ } @ARGV) {
+	canonicalise_suite();
+	push @cmd, "--git-debian-branch=".lbranch();
+    }
+    runcmd_ordryrun @cmd, @ARGV;
 }
 
 sub cmd_quilt_fixup {
