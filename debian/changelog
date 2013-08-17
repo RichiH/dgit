@@ -1,3 +1,10 @@
+dgit (0.3~0.1) experimental; urgency=low
+
+  * This version appears to be able to push.  We still need to test
+    fetching a dgit-based upload...
+
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Sat, 17 Aug 2013 09:18:04 +0100
+
 dgit (0.2) experimental; urgency=low
 
   * New version which might actually work but probably won't.

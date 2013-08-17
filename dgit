@@ -431,7 +431,7 @@ sub rev_parse ($) {
 
 sub is_fast_fwd ($$) {
     my ($ancestor,$child) = @_;
-    my $mb = cmdoutput @git, qw(merge-base), $dsc_hash, $upload_hash;
+    my $mb = cmdoutput @git, qw(merge-base), $ancestor, $child;
     return rev_parse($mb) eq rev_parse($ancestor);
 }
 
