@@ -551,6 +551,18 @@ sub pull () {
     printdone "fetched to ".lrref()." and merged into HEAD";
 }
 
+sub check_not_dirty () {
+    my $output = cmdoutput @git, qw(status --porcelain);
+    if (length $output) {
+	my $m = "tree dirty:\n$output\n";
+	if (!$dryrun) {
+	    die $m;
+	} else {
+	    warn $m;
+	}
+    }
+}
+
 sub dopush () {
     runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
@@ -558,6 +570,7 @@ sub dopush () {
     my $dscfn = "${package}_$clogp->{Version}.dsc";
     stat "../$dscfn" or die "$dscfn $!";
     $dsc = parsecontrol("../$dscfn");
+    check_not_dirty();
     prep_ud();
     chdir $ud or die $!;
     print "checking that $dscfn corresponds to HEAD\n";
@@ -671,6 +684,7 @@ sub cmd_pull {
 sub cmd_push {
     parseopts();
     die if defined $package;
+    runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     if (@ARGV==0) {
