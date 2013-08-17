@@ -414,10 +414,11 @@ Last allegedly pushed/uploaded: $oldclogp->{Version} (newer or same)
 Perhaps the upload is stuck in incoming.  Using the version from git.
 END
             $outputhash = $upload_hash;
-	} else {
-	    die "version in archive is same as version in git".
-		" to-be-uploaded (upload/) branch but archive".
-		" version hash no commit hash?!\n";
+	} elsif ($outputhash ne $upload_hash) {
+	    die "version in archive ($clogp->{Version})".
+		" is same as version in git".
+		" to-be-uploaded (upload/) branch ($oldclogp->{Version})".
+		" but archive version hash no commit hash?!\n";
         }
     }
     chdir '../../../..' or die $!;
