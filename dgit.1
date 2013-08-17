@@ -67,7 +67,7 @@ If you are lucky the other uploaders have also used dgit and
 integrated the other relevant git history; if not you can fetch it
 into your tree and cherry-pick etc. as you wish.
 .SH WORKFLOW - INTEGRATING BETWEEN DGIT AND OTHER GIT HISTORY
-If you are the maintainer of a package, to deal with uploads made
+If you are the maintainer of a package dealing with uploads made
 without dgit, you will probably want to merge the synthetic commits
 (made by dgit to represent the uploads) into your git history.
 Normally you can just merge the dgit branch into your own master, or
@@ -75,11 +75,11 @@ indeed if you do your work on the dgit local suite branch
 .BI dgit/ suite
 you can just use dgit pull.
 
-However the first time you use dgit it will generate a new origin
+However the first time dgit is used it will generate a new origin
 commit from the archive which won't be linked into the rest of your
 git history.  You will need to merge this.
 
-If last upload was made with git, you should usually proceed
+If last upload was in fact made with git, you should usually proceed
 as follows: identify the commit which was actually used to build the
 package.  (Hopefully you have a tag for this.)  Check out the dgit
 branch
@@ -97,12 +97,13 @@ to start using dgit.  First, do
 (or clone) obtain a git history representation of what's in the
 archive and record it in the
 .BI remotes/dgit/ suite
-tracking branch.  Then construct somehow a git commit whose tree
-corresponds to the tree to use for the next upload.  If that
-commit-to-be-uploaded is not a descendant of the dig tracking remote,
-check it out and say
-.RB ( "git merge -s ours debian/" \fIversion\fR).
-That tells git that we are intentionally throwing away any differences
+tracking branch.  Then construct somehow, using your other git history
+plus appropriate diffs and cherry picks from the dgit remote tracking
+branch, a git commit whose tree corresponds to the tree to use for the
+next upload.  If that commit-to-be-uploaded is not a descendant of the
+dig remote tracking branch, check it out and say
+.BR "git merge -s ours remotes/dgit/" \fIsuite\fR;
+that tells git that we are deliberately throwing away any differences
 between what's in the archive and what you intend to upload.
 Then run
 .BR "dgit push"
@@ -160,10 +161,10 @@ previous upload is recorded in a new patch constructed by dpkg-source.
 If you are not the maintainer, you do not need to worry about the
 source format of the package.  You can just make changes as you like
 in git.  If the package is a `3.0 (quilt)' package, the patch stack
-will not (necessarily) be represented in the git history.
+will usually not be represented in the git history.
 
 If you are the maintainer of a non-native package, you currently have
-two sensible options.
+two sensible options:
 
 Firstly, you can regard your git history as primary, and the archive
 as an export format.  For example, you could maintain topic branches
@@ -176,7 +177,7 @@ represented in the single Debian patch.
 
 Secondly, you can regard your quiltish patch stack in the archive as
 primary.  You will have to use other tools besides dgit to import and
-export this patch stack.
+export this patch stack.  See also the BUGS section.
 .SH OPTIONS
 .TP
 .BR --dry-run | -n
