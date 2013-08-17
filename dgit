@@ -111,8 +111,10 @@ sub cmdoutput_errok {
     $!=0; $?=0;
     { local $/ = undef; $d = <P>; }
     die if P->error;
-    close P or return undef;
+    if (!close P) { print DEBUG "=>!$?\n" if $debug>0; return undef; }
     chomp $d;
+    $d =~ m/^.*/;
+    print DEBUG "=> \`$&'",(length $' ? '...' : ''),"\n" if $debug>0; #';
     return $d;
 }
 
@@ -153,7 +155,6 @@ sub cfg {
 	    $v = cmdoutput_errok(@git, qw(config --), $c);
 	};
 	if ($?==0) {
-	    chomp $v;
 	    return $v;
 	} elsif ($?!=256) {
 	    die "$c $?";
@@ -319,7 +320,7 @@ sub mktree_in_ud_from_only_subdir () {
     symlink '../../../../objects','.git/objects' or die $!;
     runcmd @git, qw(add -Af);
     my $tree = cmdoutput @git, qw(write-tree);
-    chomp $tree; $tree =~ m/^\w+$/ or die "$tree ?";
+    $tree =~ m/^\w+$/ or die "$tree ?";
     return ($tree,$dir);
 }
 
@@ -599,7 +600,6 @@ sub cmd_clone {
 
 sub branchsuite () {
     my $branch = cmdoutput_errok @git, qw(symbolic-ref HEAD);
-    chomp $branch;
     if ($branch =~ m#$lbranch_re#o) {
 	return $1;
     } else {
