@@ -559,7 +559,7 @@ sub commit_quilty_patch () {
     my $output = cmdoutput @git, qw(status --porcelain);
     my $vsn = $dsc->{Version};
     my %fixups = map {$_=>1}
-        (".pc/debian-changes-$vsn/","debian/patches/debian-changes-2.8-5");
+        (".pc/debian-changes-$vsn/","debian/patches/debian-changes-$vsn");
     my @files;
     foreach my $l (split /\n/, $output) {
 	next unless $l =~ s/^\?\? //;
@@ -584,6 +584,7 @@ sub dopush () {
     $dsc = parsecontrol("../$dscfn");
     print DEBUG "format $dsc->{Format}\n";
     if ($dsc->{Format} eq '3.0 (quilt)') {
+	print "Format \`$dsc->{Format}', urgh\n";
 	commit_quilty_patch();
     }
     check_not_dirty();

@@ -52,7 +52,10 @@ Tagging and signing should be left to dgit push.
 does an `upload', pushing the current HEAD to the archive (as a source
 package) and to dgit-repos (as git commits).  This also involves
 making a signed git tag, and signing the files to be uploaded to the
-archive.
+archive.  (For a format `3.0 (quilt)' source package, dgit push
+may also have to make a commit on your current branch to contain
+quilt metadata.  It will do this automatically.)
+.BR "debian/rules clean" .
 .SH WORKFLOW - SIMPLE
 It is always possible with dgit to clone or fetch a package, make
 changes in git (using git-commit) on the suite branch
