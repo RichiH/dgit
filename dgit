@@ -27,7 +27,7 @@ use File::Path;
 use Dpkg::Version;
 use POSIX;
 
-our $suite = 'sid';
+our $isuite = 'unstable';
 our $package;
 
 our $sign = 1;
@@ -54,16 +54,17 @@ our %opts_opt_map = ('dget' => \@dget,
 our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-Dgit-Master';
 our $branchprefix = 'dgit';
+our $csuite;
 
-sub lbranch () { return "$branchprefix/$suite"; }
+sub lbranch () { return "$branchprefix/$csuite"; }
 my $lbranch_re = '^refs/heads/'.$branchprefix.'/([^/.]+)$';
 sub lref () { return "refs/heads/".lbranch(); }
-sub lrref () { return "refs/remotes/$remotename/$suite"; }
-sub rrref () { return "refs/$branchprefix/$suite"; }
+sub lrref () { return "refs/remotes/$remotename/$csuite"; }
+sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
 
 sub fetchspec () {
-    local $suite = '*';
+    local $csuite = '*';
     return  "+".rrref().":".lrref();
 }
 
@@ -154,6 +155,9 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit-distro.debian.git-path' => '/git/dgit-repos',
 	       'dgit-distro.debian.git-check' => 'ssh-cmd',
 	       'dgit-distro.debian.git-create' => 'ssh-cmd',
+	       'dgit-distro.debian.sshdakls-host' => 'coccia.debian.org',
+	       'dgit-distro.debian.sshdakls-dir' =>
+	           '/srv/ftp-master.debian.org/ftp/dists',
 	       'dgit-distro.debian.mirror' => 'http://http.debian.net/debian/');
 
 sub cfg {
@@ -175,22 +179,27 @@ sub cfg {
 }
 
 sub access_distro () {
-    return cfg("dgit-suite.$suite.distro",
+    return cfg("dgit-suite.$isuite.distro",
 	       "dgit.default.distro");
 }
 
-sub access_cfg ($) {
-    my ($key) = @_;
+sub access_cfg (@) {
+    my (@keys) = @_;
     my $distro = access_distro();
-    my $value = cfg("dgit-distro.$distro.$key",
-		    "dgit.default.$key");
+    my $value = cfg(map { ("dgit-distro.$distro.$_",
+			   "dgit.default.$_") } @keys);
     return $value;
 }
 
-sub access_gituserhost () {
-    my $user = access_cfg('git-user');
-    my $host = access_cfg('git-host');
+sub access_someuserhost ($) {
+    my ($some) = @_;
+    my $user = access_cfg("$some-user",'username');
+    my $host = access_cfg("$some-host");
     return defined($user) && length($user) ? "$user\@$host" : $host;
+}
+
+sub access_gituserhost () {
+    return access_someuserhost('git');
 }
 
 sub access_giturl () {
@@ -221,16 +230,57 @@ sub parsechangelog {
 
 our %rmad;
 
-sub archive_query () {
+sub archive_query ($) {
+    my ($method) = @_;
     my $query = access_cfg('archive-query');
-    $query ||= "madison:".access_distro();
+    if (!$query) {
+	my $distro = access_distro();
+	if ($distro eq 'debian') {
+	    $query = "sshdakls:".
+		access_someuserhost('sshdakls').':'.
+	        access_cfg('sshdakls-dir');
+	} else {
+	    $query = "madison:$distro";
+	}
+    }
     $query =~ s/^(\w+):// or die "$query ?";
     my $proto = $1;
-    my $url = $'; #';
+    my $data = $'; #';
+    { no strict qw(refs); &{"${method}_${proto}"}($proto,$data); }
+}
+
+sub archive_query_madison ($$) {
+    my ($proto,$data) = @_;
     die unless $proto eq 'madison';
     $rmad{$package} ||= cmdoutput
-	qw(rmadison -asource),"-s$suite","-u$url",$package;
+	qw(rmadison -asource),"-s$isuite","-u$data",$package;
     my $rmad = $rmad{$package};
+    return madison_parse($rmad);
+}
+
+sub archive_query_sshdakls ($$) {
+    my ($proto,$data) = @_;
+    $data =~ s/:.*// or die "$data ?";
+    my $dakls = cmdoutput
+	access_cfg('ssh'), $data, qw(dak ls -asource),"-s$isuite",$package;
+    return madison_parse($dakls);
+}
+
+sub canonicalise_suite_sshdakls ($$) {
+    my ($proto,$data) = @_;
+    $data =~ m/:/ or die "$data ?";
+    my $dakls = cmdoutput
+	access_cfg('ssh'), $`,
+	"set -e; cd $';".
+	" if test -h $isuite; then readlink $isuite; exit 0; fi;".
+	" if test -d $isuite; then echo $isuite; exit 0; fi;".
+	" exit 1";
+    die unless $dakls =~ m/^\w/;
+    return $dakls;
+}
+
+sub madison_parse ($) {
+    my ($rmad) = @_;
     if (!length $rmad) {
 	return ();
     }
@@ -240,11 +290,7 @@ sub archive_query () {
                  \s*( [^ \t|]+ )\s* }x or die "$rmad $?";
     $1 eq $package or die "$rmad $package ?";
     my $vsn = $2;
-    if ($suite ne $3) {
-	# madison canonicalises for us
-	print "canonical suite name for $suite is $3\n";
-	$suite = $3;
-    }
+    my $newsuite = $3;
     my $component;
     if (defined $4) {
 	$component = $4;
@@ -254,15 +300,26 @@ sub archive_query () {
     $5 eq 'source' or die "$rmad ?";
     my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
     my $subpath = "/pool/$component/$prefix/$package/${package}_$vsn.dsc";
-    return ($vsn,$subpath);
+    return ($vsn,$subpath,$newsuite);
+}
+
+sub canonicalise_suite_madison ($$) {
+    my @r = archive_query_madison($_[0],$_[1]);
+    @r or die;
+    return $r[2];
 }
 
 sub canonicalise_suite () {
-    archive_query() or die;
+    $csuite = archive_query('canonicalise_suite');
+    if ($isuite ne $csuite) {
+	# madison canonicalises for us
+	print "canonical suite name for $isuite is $csuite\n";
+    }
 }
 
 sub get_archive_dsc () {
-    my ($vsn,$subpath) = archive_query();
+    my ($vsn,$subpath) = archive_query('archive_query');
+    canonicalise_suite();
     if (!defined $vsn) { $dsc=undef; return undef; }
     $dscurl = access_cfg('mirror').$subpath;
     $dscdata = url_get($dscurl);
@@ -404,7 +461,7 @@ parent $outputhash
 author $authline
 committer $authline
 
-Record $package ($clogp->{Version}) in archive suite $suite
+Record $package ($clogp->{Version}) in archive suite $csuite
 END
             $outputhash = make_commit qw(../commit2.tmp);
 	} elsif ($vcmp > 0) {
@@ -515,6 +572,7 @@ sub fetch_from_archive () {
 
 sub clone ($) {
     my ($dstdir) = @_;
+    canonicalise_suite();
     die "dry run makes no sense with clone" if $dryrun;
     mkdir $dstdir or die "$dstdir $!";
     chdir "$dstdir" or die "$dstdir $!";
@@ -546,7 +604,7 @@ sub fetch () {
 
 sub pull () {
     fetch();
-    runcmd_ordryrun @git, qw(merge -m),"Merge from $suite [dgit]",
+    runcmd_ordryrun @git, qw(merge -m),"Merge from $csuite [dgit]",
         lrref();
     printdone "fetched to ".lrref()." and merged into HEAD";
 }
@@ -621,7 +679,7 @@ sub dopush () {
     runcmd_ordryrun @git, qw(push),access_giturl(),"HEAD:".rrref();
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
-		       "Release $dsc->{Version} for $suite [dgit]");
+		       "Release $dsc->{Version} for $csuite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;
 	push @tag_cmd, $tag;
 	runcmd_ordryrun @tag_cmd;
@@ -644,11 +702,11 @@ sub cmd_clone {
     if (@ARGV==1) {
 	($package) = @ARGV;
     } elsif (@ARGV==2 && $ARGV[1] =~ m#^\w#) {
-	($package,$suite) = @ARGV;
+	($package,$isuite) = @ARGV;
     } elsif (@ARGV==2 && $ARGV[1] =~ m#^[./]#) {
 	($package,$dstdir) = @ARGV;
     } elsif (@ARGV==3) {
-	($package,$suite,$dstdir) = @ARGV;
+	($package,$isuite,$dstdir) = @ARGV;
     } else {
 	die;
     }
@@ -671,15 +729,15 @@ sub fetchpullargs () {
 	$package = $sourcep->{Source};
     }
     if (@ARGV==0) {
-	$suite = branchsuite();
-	if (!$suite) {
+#	$isuite = branchsuite();  # this doesn't work because dak hates canons
+	if (!$isuite) {
 	    my $clogp = parsechangelog();
-	    $suite = $clogp->{Distribution};
+	    $isuite = $clogp->{Distribution};
 	}
 	canonicalise_suite();
-	print "fetching from suite $suite\n";
+	print "fetching from suite $csuite\n";
     } elsif (@ARGV==1) {
-	($suite) = @ARGV;
+	($isuite) = @ARGV;
 	canonicalise_suite();
     } else {
 	die;
@@ -705,7 +763,7 @@ sub cmd_push {
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     if (@ARGV==0) {
-	$suite = $clogp->{Distribution};
+	$isuite = $clogp->{Distribution};
 	if ($new_package) {
 	    local ($package) = $existing_package; # this is a hack
 	    canonicalise_suite();
@@ -725,7 +783,7 @@ sub cmd_build {
     # we pass further options and args to git-buildpackage
     die if defined $package;
     my $clogp = parsechangelog();
-    $suite = $clogp->{Distribution};
+    $isuite = $clogp->{Distribution};
     $package = $clogp->{Source};
     canonicalise_suite() unless grep { m/^--git-debian-branch/ } @ARGV;
     runcmd_ordryrun

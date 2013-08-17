@@ -255,9 +255,11 @@ on the dgit command line.
 .TP
 .BI dgit.default.distro
 .TP
-.BI dgit.default.username
+.BI dgit-distro. distro .username
 .TP
 .BI dgit-distro. distro .git-url
+.TP
+.BI dgit-distro. distro .git-user
 .TP
 .BI dgit-distro. distro .git-host
 .TP
@@ -277,6 +279,12 @@ on the dgit command line.
 .TP
 .BI dgit-distro. distro .archive-query-default-component
 .TP
+.BI dgit-distro. distro .sshdakls-user
+.TP
+.BI dgit-distro. distro .sshdakls-host
+.TP
+.BI dgit-distro. distro .sshdakls-dir
+.TP
 .BI dgit-distro. distro .ssh
 .TP
 .BR dgit.default. *
@@ -293,10 +301,14 @@ to an unavailable commit).
 
 The method of canonicalising suite names is bizarre.  See the
 .B --existing-package
-option for one of the implication.s
+option for one of the implications.
 
 dgit push should perhaps do `git push origin', or something similar,
 by default.
+
+Debian does not have a working rmadison server, so to find out what
+version of a package is in the archive, or to canonicalise suite
+names, we ssh directly into the ftpmaster server.
 
 The mechanism for checking for and creating per-package repos on
 alioth is a hideous bodge.  One consequence is that dgit currently
