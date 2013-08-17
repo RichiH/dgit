@@ -486,7 +486,7 @@ sub fetch_from_archive () {
     } else {
 	die "$lrref_fn $!";
     }
-    print DEBUG "last upload hash $upload_hash\n";
+    print DEBUG "previous reference hash $upload_hash\n";
     my $hash;
     if (defined $dsc_hash) {
 	die "missing git history even though dsc has hash"
