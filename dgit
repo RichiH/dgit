@@ -336,6 +336,11 @@ sub is_orig_file ($) {
     m/\.orig(?:-\w+)?\.tar\.\w+$/;
 }
 
+sub make_commit ($) {
+    my ($file) = @_;
+    return cmdoutput @git, qw(hash-object -w -t commit), $file;
+}
+
 sub generate_commit_from_dsc () {
     prep_ud();
     chdir $ud or die $!;
@@ -362,9 +367,8 @@ sub generate_commit_from_dsc () {
     my $authline = "$author $date";
     $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or die $authline;
     open C, ">../commit.tmp" or die $!;
-    print C "tree $tree\n" or die $!;
-    print C "parent $upload_hash\n" or die $! if $upload_hash;
     print C <<END or die $!;
+tree $tree
 author $authline
 committer $authline
 
@@ -373,10 +377,23 @@ $clogp->{Changes}
 # imported from the archive
 END
     close C or die $!;
-    my $commithash = cmdoutput @git, qw(hash-object -w -t commit ../commit.tmp);
+    my $commithash = make_commit qw(../commit.tmp);
+    if ($upload_hash) {
+	open C, ">../commit2.tmp" or die $!;
+	print C <<END or die $!;
+tree $tree
+parent $upload_hash
+parent $commithash
+author $authline
+committer $authline
+
+Record $package ($clogp->{Version}) in archive suite $suite
+END
+        $commithash = make_commit qw(../commit2.tmp);
+    }
     print "synthesised git commit from .dsc $clogp->{Version}\n";
     chdir '../../../..' or die $!;
-    cmdoutput @git, qw(update-ref -m),"dgit synthesise $clogp->{Version}",
+    cmdoutput @git, qw(update-ref -m),"dgit fetch import $clogp->{Version}",
               'DGIT_ARCHIVE', $commithash;
     cmdoutput @git, qw(log -n2), $commithash;
     # ... gives git a chance to complain if our commit is malformed
