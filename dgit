@@ -146,7 +146,7 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit-distro.debian.git-path' => '/git/dgit-repos',
 	       'dgit-distro.debian.git-check' => 'ssh-cmd',
 	       'dgit-distro.debian.git-create' => 'ssh-cmd',
-	       'dgit-distro.debian.mirror' => 'http://ftp.debian.org/debian/');
+	       'dgit-distro.debian.mirror' => 'http://http.debian.net/debian/');
 
 sub cfg {
     foreach my $c (@_) {
