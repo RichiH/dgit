@@ -563,8 +563,26 @@ sub check_not_dirty () {
     }
 }
 
+sub commit_quilty_patch () {
+    my $output = cmdoutput @git, qw(status --porcelain);
+    my $vsn = $dsc->{Version};
+    my %fixups = map {$_=>1}
+        (".pc/debian-changes-$vsn/","debian/patches/debian-changes-2.8-5");
+    my @files;
+    foreach my $l (split /\n/, $output) {
+	next unless $l =~ s/^\?\? //;
+	next unless $fixups{$l};
+	push @files, $l;
+    }
+    print DEBUG "checking for quilty\n", Dumper(\@files);
+    if (@files == 2) {
+	runcmd_ordryrun @git, qw(add), @files;
+	runcmd_ordryrun
+	    @git, qw(commit -m), "Commit Debian 3.0 (quilt) metadata";
+    }
+}
+
 sub dopush () {
-    runcmd @git, qw(diff --quiet HEAD);
     print DEBUG "actually entering push\n";
     runcmd qw(debian/rules clean);
     my $clogp = parsechangelog();
@@ -572,6 +590,10 @@ sub dopush () {
     my $dscfn = "${package}_$clogp->{Version}.dsc";
     stat "../$dscfn" or die "$dscfn $!";
     $dsc = parsecontrol("../$dscfn");
+    print DEBUG "format $dsc->{Format}\n";
+    if ($dsc->{Format} eq '3.0 (quilt)') {
+	commit_quilty_patch();
+    }
     check_not_dirty();
     prep_ud();
     chdir $ud or die $!;
