@@ -104,6 +104,14 @@ sub runcmd {
     die "@_ $! $?" if system @_;
 }
 
+sub printdone {
+    if (!$dryrun) {
+	print "dgit ok: @_\n";
+    } else {
+	print "would be ok: @_ (but dry run only)\n";
+    }
+}
+
 sub cmdoutput_errok {
     die Dumper(\@_)." ?" if grep { !defined } @_;
     printcmd(\*DEBUG,"|",@_) if $debug>0;
@@ -524,7 +532,7 @@ sub clone ($) {
     }
     fetch_from_archive() or die;
     runcmd @git, qw(reset --hard), lrref();
-    print "dgit ok: ready for work in $dstdir\n";
+    printdone "ready for work in $dstdir";
 }
 
 sub fetch () {
@@ -532,7 +540,7 @@ sub fetch () {
 	git_fetch_us();
     }
     fetch_from_archive() or die;
-    print "dgit ok: fetched into ".lrref()."\n";
+    printdone "fetched into ".lrref();
 }
 
 sub pull () {
@@ -595,7 +603,7 @@ sub dopush () {
     my $host = access_cfg('upload-host');
     my @hostarg = defined($host) ? ($host,) : ();
     runcmd_ordryrun @dput, @hostarg, $changesfile;
-    print "dgit ok: pushed and uploaded $dsc->{Version}\n";
+    printdone "pushed and uploaded $dsc->{Version}";
 }
 
 sub cmd_clone {
@@ -740,6 +748,7 @@ sub parseopts () {
 }
 
 parseopts();
+print STDERR "DRY RUN ONLY\n" if $dryrun;
 die unless @ARGV;
 my $cmd = shift @ARGV;
 
