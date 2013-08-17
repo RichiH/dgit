@@ -555,9 +555,9 @@ sub check_not_dirty () {
     runcmd @git, qw(diff --quiet);
 }
 
-sub commit_quilty_patch () {
+sub commit_quilty_patch ($) {
+    my ($vsn) = @_;
     my $output = cmdoutput @git, qw(status --porcelain);
-    my $vsn = $dsc->{Version};
     my %fixups = map {$_=>1}
         (".pc/debian-changes-$vsn/","debian/patches/debian-changes-$vsn");
     my @files;
@@ -585,7 +585,7 @@ sub dopush () {
     print DEBUG "format $dsc->{Format}\n";
     if ($dsc->{Format} eq '3.0 (quilt)') {
 	print "Format \`$dsc->{Format}', urgh\n";
-	commit_quilty_patch();
+	commit_quilty_patch($dsc->{Version});
     }
     check_not_dirty();
     prep_ud();
@@ -735,6 +735,11 @@ sub cmd_build {
 	@ARGV;
 }
 
+sub cmd_quilt_fixup {
+    my $clogp = parsechangelog();
+    commit_quilty_patch($clogp->{Version});
+}
+
 sub parseopts () {
     my $om;
     while (@ARGV) {
@@ -784,5 +789,5 @@ parseopts();
 print STDERR "DRY RUN ONLY\n" if $dryrun;
 die unless @ARGV;
 my $cmd = shift @ARGV;
-
+$cmd =~ y/-/_/;
 { no strict qw(refs); &{"cmd_$cmd"}(); }
