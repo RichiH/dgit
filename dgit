@@ -548,7 +548,7 @@ sub pull () {
     fetch();
     runcmd_ordryrun @git, qw(merge -m),"Merge from $suite [dgit]",
         lrref();
-    print "dgit ok: fetched to ".lrref()." and merged into HEAD\n";
+    printdone "fetched to ".lrref()." and merged into HEAD";
 }
 
 sub dopush () {
