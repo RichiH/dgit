@@ -736,6 +736,7 @@ sub cmd_build {
 }
 
 sub cmd_quilt_fixup {
+    die if @ARGV;
     my $clogp = parsechangelog();
     commit_quilty_patch($clogp->{Version});
 }
