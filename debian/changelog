@@ -1,6 +1,6 @@
-dgit (0.2~0.1) experimental; urgency=low
+dgit (0.2) experimental; urgency=low
 
-  * New version which might actually work.
+  * New version which might actually work but probably won't.
 
  -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Fri, 16 Aug 2013 16:52:17 +0100
 
