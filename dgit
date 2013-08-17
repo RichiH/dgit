@@ -42,7 +42,6 @@ our (@git) = qw(git);
 our (@dget) = qw(dget);
 our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
-our (@cleancmd) = qw(debian/rules clean);
 our $keyid;
 
 our $debug = 0;
@@ -553,15 +552,7 @@ sub pull () {
 }
 
 sub check_not_dirty () {
-    my $output = cmdoutput @git, qw(status --porcelain);
-    if (length $output) {
-	my $m = "tree dirty:\n$output\n";
-	if (!$dryrun) {
-	    die $m;
-	} else {
-	    warn $m;
-	}
-    }
+    runcmd @git, qw(diff --quiet);
 }
 
 sub commit_quilty_patch () {
@@ -577,15 +568,15 @@ sub commit_quilty_patch () {
     }
     print DEBUG "checking for quilty\n", Dumper(\@files);
     if (@files == 2) {
+	my $m = "Commit Debian 3.0 (quilt) metadata";
+	print "$m\n";
 	runcmd_ordryrun @git, qw(add), @files;
-	runcmd_ordryrun
-	    @git, qw(commit -m), "Commit Debian 3.0 (quilt) metadata";
+	runcmd_ordryrun @git, qw(commit -m), $m;
     }
 }
 
 sub dopush () {
     print DEBUG "actually entering push\n";
-    runcmd @cleancmd;
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
@@ -762,8 +753,6 @@ sub parseopts () {
 		push @$om, $2;
 	    } elsif (m/^--existing-package=(.*)/s) {
 		$existing_package = $1;
-	    } elsif (m/^--clean-command=(.*)/s) {
-		@cleancmd = split /\s+/, $1;
 	    } else {
 		die "$_ ?";
 	    }
