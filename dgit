@@ -369,7 +369,7 @@ committer $authline
 
 $clogp->{Changes}
 
-# imported by dgit from the archive
+# imported from the archive
 END
     close C or die $!;
     my $commithash = cmdoutput @git, qw(hash-object -w -t commit ../commit.tmp);
