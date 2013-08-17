@@ -24,6 +24,7 @@ use Data::Dumper;
 use LWP::UserAgent;
 use Dpkg::Control::Hash;
 use File::Path;
+use Dpkg::Version;
 use POSIX;
 
 our $suite = 'sid';
@@ -274,7 +275,6 @@ sub check_for_git () {
 	    (access_cfg('ssh'),access_gituserhost(),
 	     " set -e; cd ".access_cfg('git-path').";".
 	     " if test -d $package.git; then echo 1; else echo 0; fi");
-	print DEBUG "got \`$r'\n";
 	die "$r $! $?" unless $r =~ m/^[01]$/;
 	return $r+0;
     } else {
@@ -377,50 +377,46 @@ $clogp->{Changes}
 # imported from the archive
 END
     close C or die $!;
-    my $commithash = make_commit qw(../commit.tmp);
+    my $outputhash = make_commit qw(../commit.tmp);
+    print "synthesised git commit from .dsc $clogp->{Version}\n";
     if ($upload_hash) {
-	open C, ">../commit2.tmp" or die $!;
-	print C <<END or die $!;
+	runcmd @git, qw(reset --hard), $upload_hash;
+	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
+	my $oldclogp = Dpkg::Control::Hash->new();
+	$oldclogp->load('../changelogold.tmp','previous changelog') or die;
+	my $vcmp =
+	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
+	if ($vcmp < 0) {
+	    # git upload/ is earlier vsn than archive, use archive
+	    open C, ">../commit2.tmp" or die $!;
+	    print C <<END or die $!;
 tree $tree
 parent $upload_hash
-parent $commithash
+parent $outputhash
 author $authline
 committer $authline
 
 Record $package ($clogp->{Version}) in archive suite $suite
 END
-        $commithash = make_commit qw(../commit2.tmp);
-    }
-    print "synthesised git commit from .dsc $clogp->{Version}\n";
-    chdir '../../../..' or die $!;
-    cmdoutput @git, qw(update-ref -m),"dgit fetch import $clogp->{Version}",
-              'DGIT_ARCHIVE', $commithash;
-    cmdoutput @git, qw(log -n2), $commithash;
-    # ... gives git a chance to complain if our commit is malformed
-    my $outputhash = $commithash;
-    if ($upload_hash) {
-	chdir "$ud/$dir" or die $!;
-	runcmd @git, qw(reset --hard), $upload_hash;
-	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
-	my $oldclogp = Dpkg::Control::Hash->new();
-	$oldclogp->parse('../changelogold.tmp','previous changelog') or die;
-	my $vcmp =
-	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
-	if ($vcmp < 0) {
-	    # git upload/ is earlier vsn than archive, use archive
-	} elsif ($vcmp >= 0) {
+            $outputhash = make_commit qw(../commit2.tmp);
+	} elsif ($vcmp > 0) {
 	    print STDERR <<END or die $!;
 Version actually in archive:    $clogp->{Version} (older)
 Last allegedly pushed/uploaded: $oldclogp->{Version} (newer or same)
 Perhaps the upload is stuck in incoming.  Using the version from git.
 END
+            $outputhash = $upload_hash;
 	} else {
 	    die "version in archive is same as version in git".
 		" to-be-uploaded (upload/) branch but archive".
 		" version hash no commit hash?!\n";
         }
-	chdir '../../../..' or die $!;
     }
+    chdir '../../../..' or die $!;
+    runcmd @git, qw(update-ref -m),"dgit fetch import $clogp->{Version}",
+            'DGIT_ARCHIVE', $outputhash;
+    cmdoutput @git, qw(log -n2), $outputhash;
+    # ... gives git a chance to complain if our commit is malformed
     rmtree($ud);
     return $outputhash;
 }
@@ -491,10 +487,11 @@ sub fetch_from_archive () {
     } else {
 	$hash = generate_commit_from_dsc();
     }
+    print DEBUG "current hash $hash\n";
     if ($upload_hash) {
 	die "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
-	    unless is_fast_fwd($dsc_hash, $upload_hash);
+	    unless is_fast_fwd($upload_hash, $hash);
     }
     if ($upload_hash ne $hash) {
 	my @upd_cmd = (@git, qw(update-ref -m), 'dgit fetch', lrref(), $hash);
