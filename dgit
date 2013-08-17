@@ -42,6 +42,7 @@ our (@git) = qw(git);
 our (@dget) = qw(dget);
 our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
+our (@cleancmd) = qw(debian/rules clean);
 our $keyid;
 
 our $debug = 0;
@@ -584,7 +585,7 @@ sub commit_quilty_patch () {
 
 sub dopush () {
     print DEBUG "actually entering push\n";
-    runcmd qw(debian/rules clean);
+    runcmd @cleancmd;
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
@@ -761,6 +762,8 @@ sub parseopts () {
 		push @$om, $2;
 	    } elsif (m/^--existing-package=(.*)/s) {
 		$existing_package = $1;
+	    } elsif (m/^--clean-command=(.*)/s) {
+		@cleancmd = split /\s+/, $1;
 	    } else {
 		die "$_ ?";
 	    }
