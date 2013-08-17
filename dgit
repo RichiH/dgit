@@ -565,6 +565,8 @@ sub check_not_dirty () {
 
 sub dopush () {
     runcmd @git, qw(diff --quiet HEAD);
+    print DEBUG "actually entering push\n";
+    runcmd qw(debian/rules clean);
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
