@@ -7,3 +7,7 @@ remote refs
 local refs
   refs/heads/<suite>
   refs/remotes/dgit/<suite>
+
+Vcs-Dgit-Master: <commit>
+  specifies commit hash corresponding to the thing uploaded
+  optional commit hash corresponding to pristine tar??

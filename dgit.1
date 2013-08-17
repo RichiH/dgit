@@ -224,6 +224,8 @@ which will make the required pseudo-merge.
 
 If the dgit push fails halfway through, it should be restartable and
 idempotent.  However this is not true for the git tag operation.
+Also, it would be good to check that the proposed signing key is
+available before starting work.
 
 dgit's handling of .orig.tar.gz is not very sophisticated.  Ideally
 the .orig.tar.gz could be transported via the git repo as git tags.
