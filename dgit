@@ -454,15 +454,17 @@ sub fetch_from_archive () {
 	print "last upload to archive has NO git hash\n";
     }
 
-    $!=0; $upload_hash =
-	cmdoutput_errok @git, qw(show-ref --heads), lrref();
-    if ($?==0) {
-	die unless chomp $upload_hash;
-    } elsif ($?==256) {
+    my $lrref_fn = ".git/".lrref();
+    if (open H, $lrref_fn) {
+	$upload_hash = <H>;
+	chomp $upload_hash;
+	die "$lrref_fn $upload_hash ?" unless $upload_hash =~ m/^\w+$/;
+    } elsif ($! == &ENOENT) {
 	$upload_hash = '';
     } else {
-	die $?;
+	die "$lrref_fn $!";
     }
+    print DEBUG "last upload hash $upload_hash\n";
     my $hash;
     if (defined $dsc_hash) {
 	die "missing git history even though dsc has hash"
