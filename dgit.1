@@ -53,7 +53,61 @@ does an `upload', pushing the current HEAD to the archive (as a source
 package) and to dgit-repos (as git commits).  This also involves
 making a signed git tag, and signing the files to be uploaded to the
 archive.
-.SH MODEL AND WORKFLOW
+.SH WORKFLOW - SIMPLE
+It is always possible with dgit to clone or fetch a package, make
+changes in git (using git-commit) on the suite branch
+.RB ( "git checkout dgit/" \fIsuite\fR)
+and then dgit push.  You can use whatever gitish techniques you like
+to construct the commit to push; the only requirement is that it is a
+descendant of the state of the archive, as provided by dgit in the
+remote tracking branch
+.BR remotes/dgit/ \fIsuite\fR.
+
+If you are lucky the other uploaders have also used dgit and
+integrated the other relevant git history; if not you can fetch it
+into your tree and cherry-pick etc. as you wish.
+.SH WORKFLOW - INTEGRATING BETWEEN DGIT AND OTHER GIT HISTORY
+If you are the maintainer of a package, to deal with uploads made
+without dgit, you will probably want to merge the synthetic commits
+(made by dgit to represent the uploads) into your git history.
+Normally you can just merge the dgit branch into your own master, or
+indeed if you do your work on the dgit local suite branch
+.BI dgit/ suite
+you can just use dgit pull.
+
+However the first time you use dgit it will generate a new origin
+commit from the archive which won't be linked into the rest of your
+git history.  You will need to merge this.
+
+If last upload was made with git, you should usually proceed
+as follows: identify the commit which was actually used to build the
+package.  (Hopefully you have a tag for this.)  Check out the dgit
+branch
+.RB ( "git checkout dgit/" \fIsuite\fR)
+and merge that other commit
+.RB ( "git merge debian/" \fIversion\fR).
+Hopefully this merge will be trivial because the two trees should
+be the same.  The resulting branch head can be merged into your
+working branches
+.RB ( "git checkout master && git merge dgit/" \fIsuite\fR).
+
+If last upload was not made with git, a different approach is required
+to start using dgit.  First, do
+.B dgit fetch
+(or clone) obtain a git history representation of what's in the
+archive and record it in the
+.BI remotes/dgit/ suite
+tracking branch.  Then construct somehow a git commit whose tree
+corresponds to the tree to use for the next upload.  If that
+commit-to-be-uploaded is not a descendant of the dig tracking remote,
+check it out and say
+.RB ( "git merge -s ours debian/" \fIversion\fR).
+That tells git that we are intentionally throwing away any differences
+between what's in the archive and what you intend to upload.
+Then run
+.BR "dgit push"
+to actually upload the result.
+.SH MODEL
 You may use any suitable git workflow with dgit, provided you
 satisfy dgit's requirements:
 
@@ -93,6 +147,36 @@ dgit expects repos that it works with to have a
 remote.  This refers to the well-known dgit-repos location
 (currently, the dgit-repos project on Alioth).  dgit fetch updates
 the remote tracking branch for dgit/suite.
+
+dgit does not (currently) represent the orig tarball(s) in git; nor
+does it represent the patch statck of a `3.0 (quilt)' package.  The
+orig tarballs are downloaded and kept in the parent directory, as with
+a traditional (non-gitish) dpkg-source workflow.
+
+To a user looking at the archive, changes pushed using dgit look like
+changes made in an NMU: in a `3.0 (quilt)' package the delta from the
+previous upload is recorded in a new patch constructed by dpkg-source.
+.SH PACKAGE SOURCE FORMATS
+If you are not the maintainer, you do not need to worry about the
+source format of the package.  You can just make changes as you like
+in git.  If the package is a `3.0 (quilt)' package, the patch stack
+will not (necessarily) be represented in the git history.
+
+If you are the maintainer of a non-native package, you currently have
+two sensible options.
+
+Firstly, you can regard your git history as primary, and the archive
+as an export format.  For example, you could maintain topic branches
+in git and a fast-forwarding release branch; or you could do your work
+directly in a merging way on the
+.BI dgit/ suite
+branches.  If you do this you should probably use a `1.0' format
+source package.  In the archive, the delta between upstream will be
+represented in the single Debian patch.
+
+Secondly, you can regard your quiltish patch stack in the archive as
+primary.  You will have to use other tools besides dgit to import and
+export this patch stack.
 .SH OPTIONS
 .TP
 .BR --dry-run | -n
