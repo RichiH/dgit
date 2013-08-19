@@ -1,7 +1,7 @@
 dgit (0.4) experimental; urgency=low
 
   * Use dgit.debian.net vhost on alioth.  Closes #720172.
-  * Fix manpage description of --existing-package.
+  * Assorted manpage fixes.
 
  --
 

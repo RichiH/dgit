@@ -104,12 +104,12 @@ working branches
 If last upload was not made with git, a different approach is required
 to start using dgit.  First, do
 .B dgit fetch
-(or clone) obtain a git history representation of what's in the
+(or clone) to obtain a git history representation of what's in the
 archive and record it in the
 .BI remotes/dgit/ suite
-tracking branch.  Then construct somehow, using your other git history
+tracking branch.  Then somehow, using your other git history
 plus appropriate diffs and cherry picks from the dgit remote tracking
-branch, a git commit whose tree corresponds to the tree to use for the
+branch, construct a git commit whose tree corresponds to the tree to use for the
 next upload.  If that commit-to-be-uploaded is not a descendant of the
 dig remote tracking branch, check it out and say
 .BR "git merge -s ours remotes/dgit/" \fIsuite\fR;
@@ -246,6 +246,15 @@ package we are trying to push.  But with --new that will not work, so
 we guess
 .B dpkg
 or use the value of this option.
+.SH SEE ALSO
+\fBdget\fP(1),
+\fBdput\fP(1),
+\fBdebsign\fP(1),
+\fBgit-config\fP(1),
+\fBgit-buildpackage\fP(1),
+\fBdpkg-buildpackage\fP(1),
+.br
+https://wiki.debian.org/Alioth
 .SH CONFIGURATION
 dgit looks at the following git config keys to control its behaviour.
 You may set them with git-config (either in system-global or per-tree
