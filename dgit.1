@@ -243,7 +243,9 @@ dgit push needs to canonicalise the suite name.  But currently
 there is no way to ask the archive to do this without knowing the
 name of an existing package.  Without --new we can just use the
 package we are trying to push.  But with --new that will not work, so
-we guess that
+we guess
+.B dpkg
+or use the value of this option.
 .SH CONFIGURATION
 dgit looks at the following git config keys to control its behaviour.
 You may set them with git-config (either in system-global or per-tree

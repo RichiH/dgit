@@ -1,3 +1,9 @@
+dgit (0.4) experimental; urgency=low
+
+  * Fix manpage description of --existing-package.
+
+ --
+
 dgit (0.3) experimental; urgency=low
 
   * New version which appears to be able to sort of work at least
