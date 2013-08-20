@@ -146,6 +146,25 @@ sub runcmd_ordryrun {
     }
 }
 
+our $helpmsg = <<END;
+main usages:
+  dgit [dgit-opts] clone [dgit-opts] package [suite] [./dir|/dir]
+  dgit [dgit-opts] fetch|pull [dgit-opts] [suite]
+  dgit [dgit-opts] build [git-buildpackage-opts|dpkg-buildpackage-opts]
+  dgit [dgit-opts] push [dgit-opts] [suite]
+important dgit options:
+  -k<keyid>           sign tag and package with <keyid> instead of default
+  --dry-run -n        do not change anything, but go through the motions
+  --new -N            allow introducing a new package
+  --debug -D          increase debug level
+  -c<name>=<value>    set git config option (used directly by dgit too)
+END
+
+sub helponly () {
+    print $helpmsg or die $!;
+    exit 0;
+}
+
 our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit.default.username' => '',
 	       'dgit.default.archive-query-default-component' => 'main',
@@ -812,6 +831,8 @@ sub parseopts () {
 		$dryrun=1;
 	    } elsif (m/^--no-sign$/) {
 		$sign=0;
+	    } elsif (m/^--help$/) {
+		helponly();
 	    } elsif (m/^--new$/) {
 		$new_package=1;
 	    } elsif (m/^--(\w+)=(.*)/s && ($om = $opts_opt_map{$1})) {
@@ -827,6 +848,8 @@ sub parseopts () {
 	    while (m/^-./s) {
 		if (s/^-n/-/) {
 		    $dryrun=1;
+		} elsif (s/^-h/-/) {
+		    helponly();
 		} elsif (s/^-D/-/) {
 		    open DEBUG, ">&STDERR" or die $!;
 		    $debug++;
@@ -848,7 +871,10 @@ sub parseopts () {
 
 parseopts();
 print STDERR "DRY RUN ONLY\n" if $dryrun;
-die unless @ARGV;
+if (!@ARGV) {
+    print STDERR $helpmsg or die $!;
+    exit 8;
+}
 my $cmd = shift @ARGV;
 $cmd =~ y/-/_/;
 { no strict qw(refs); &{"cmd_$cmd"}(); }
