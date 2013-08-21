@@ -63,6 +63,17 @@ sub lrref () { return "refs/remotes/$remotename/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
 
+our $us = 'dgit';
+
+sub fail () { die "$us: @_\n"; }
+
+sub badcfg () { print STDERR "$us: invalid configuration: @_\n"; exit 12; }
+
+sub no_such_package () {
+    print STDERR "$us: package $package does not exist in suite $suite\n";
+    exit 4;
+}
+
 sub fetchspec () {
     local $csuite = '*';
     return  "+".rrref().":".lrref();
@@ -77,7 +88,7 @@ sub url_get {
     }
     print "downloading @_...\n";
     my $r = $ua->get(@_) or die $!;
-    die "$_[0]: ".$r->status_line."; failed.\n" unless $r->is_success;
+    fail $r->status_line."; failed." unless $r->is_success;
     return $r->decoded_content();
 }
 
@@ -99,10 +110,24 @@ sub printcmd {
     print $fh "\n" or die $!;
 }
 
+sub failedcmd {
+    my $errnoval = $!;
+    printcmd \*STDERR, "$_[0]: failed command:", @_;
+    if ($errnoval) {
+	fail "failed to fork/exec: $!";
+    } elsif (!($? & 0xff)) {
+	fail "subprocess failed with error exit status ".($?>>8);
+    } elsif ($?) {
+	fail "subprocess crashed (wait status $?)";
+    } else {
+	fail "subprocess produced invalid output";
+    }
+}
+
 sub runcmd {
     printcmd(\*DEBUG,"+",@_) if $debug>0;
     $!=0; $?=0;
-    die "@_ $! $?" if system @_;
+    failedcmd @_ if system @_;
 }
 
 sub printdone {
@@ -120,7 +145,7 @@ sub cmdoutput_errok {
     my $d;
     $!=0; $?=0;
     { local $/ = undef; $d = <P>; }
-    die if P->error;
+    die $! if P->error;
     if (!close P) { print DEBUG "=>!$?\n" if $debug>0; return undef; }
     chomp $d;
     $d =~ m/^.*/;
@@ -130,7 +155,7 @@ sub cmdoutput_errok {
 
 sub cmdoutput {
     my $d = cmdoutput_errok @_;
-    defined $d or die "@_ $? $!";
+    defined $d or failedcmd @_;
     return $d;
 }
 
@@ -160,6 +185,11 @@ important dgit options:
   -c<name>=<value>    set git config option (used directly by dgit too)
 END
 
+sub badusage {
+    print STDERR "$us: @_\n", $helpmsg or die $!;
+    exit 8;
+}
+
 sub helponly () {
     print $helpmsg or die $!;
     exit 0;
@@ -181,15 +211,16 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 
 sub cfg {
     foreach my $c (@_) {
+	my @cmd = (@git, qw(config --), $c);
 	my $v;
 	{
 	    local ($debug) = $debug-1;
-	    $v = cmdoutput_errok(@git, qw(config --), $c);
+	    $v = cmdoutput_errok @cmd;
 	};
 	if ($?==0) {
 	    return $v;
 	} elsif ($?!=256) {
-	    die "$c $?";
+	    failedcmd @cmd;
 	}
 	my $dv = $defcfg{$c};
 	return $dv if defined $dv;
@@ -233,17 +264,22 @@ sub access_giturl () {
 }	       
 
 sub parsecontrol {
-    my $c = Dpkg::Control::Hash->new();
-    $c->load(@_) or return undef;
+    my ($file, $desc) = @_;
+    my $c = Dpkg::Control::Hash->new({ 'name' => $desc });
+    my $fh = new IO::File '<', $file or die "$file: $!";
+    $c->parse($fh) or die "parsing of $desc failed";
+    $fh->error and die $!;
+    close $fh;
     return $c;
 }
 
 sub parsechangelog {
     my $c = Dpkg::Control::Hash->new();
     my $p = new IO::Handle;
-    open $p, '-|', qw(dpkg-parsechangelog) or die $!;
+    my @cmd = qw(dpkg-parsechangelog);
+    open $p, '-|', @cmd or die $!;
     $c->parse($p);
-    $?=0; $!=0; close $p or die "$! $?";
+    $?=0; $!=0; close $p or failedcmd @cmd;
     return $c;
 }
 
@@ -262,7 +298,7 @@ sub archive_query ($) {
 	    $query = "madison:$distro";
 	}
     }
-    $query =~ s/^(\w+):// or die "$query ?";
+    $query =~ s/^(\w+):// or badcfg "invalid archive-query method \`$query'";
     my $proto = $1;
     my $data = $'; #';
     { no strict qw(refs); &{"${method}_${proto}"}($proto,$data); }
@@ -279,7 +315,7 @@ sub archive_query_madison ($$) {
 
 sub archive_query_sshdakls ($$) {
     my ($proto,$data) = @_;
-    $data =~ s/:.*// or die "$data ?";
+    $data =~ s/:.*// or badcfg "invalid sshdakls method string \`$data'";
     my $dakls = cmdoutput
 	access_cfg('ssh'), $data, qw(dak ls -asource),"-s$isuite",$package;
     return madison_parse($dakls);
@@ -287,14 +323,15 @@ sub archive_query_sshdakls ($$) {
 
 sub canonicalise_suite_sshdakls ($$) {
     my ($proto,$data) = @_;
-    $data =~ m/:/ or die "$data ?";
-    my $dakls = cmdoutput
+    $data =~ m/:/ or badcfg "invalid sshdakls method string \`$data'";
+    my @cmd = 
 	access_cfg('ssh'), $`,
 	"set -e; cd $';".
 	" if test -h $isuite; then readlink $isuite; exit 0; fi;".
 	" if test -d $isuite; then echo $isuite; exit 0; fi;".
 	" exit 1";
-    die unless $dakls =~ m/^\w/;
+    my $dakls = cmdoutput @cmd;
+    failedcmd @cmd unless $dakls =~ m/^\w/;
     return $dakls;
 }
 
@@ -324,7 +361,10 @@ sub madison_parse ($) {
 
 sub canonicalise_suite_madison ($$) {
     my @r = archive_query_madison($_[0],$_[1]);
-    @r or die;
+    @r or fail
+	"unable to canonialise suite using package $package".
+	" which does not appear to exist in suite $suite;".
+	" --existing-package may help";
     return $r[2];
 }
 
@@ -345,24 +385,25 @@ sub get_archive_dsc () {
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
     print DEBUG Dumper($dscdata) if $debug>1;
     $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
-    $dsc->parse($dscfh, 'dsc') or die "parsing of $dscurl failed\n";
+    $dsc->parse($dscfh, 'dsc') or fail "parsing of $dscurl failed";
     print DEBUG Dumper($dsc) if $debug>1;
     my $fmt = $dsc->{Format};
-    die "unsupported format $fmt, sorry\n" unless $format_ok{$fmt};
+    fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
 }
 
 sub check_for_git () {
     # returns 0 or 1
     my $how = access_cfg('git-check');
     if ($how eq 'ssh-cmd') {
-	my $r= cmdoutput
+	my @cmd =
 	    (access_cfg('ssh'),access_gituserhost(),
 	     " set -e; cd ".access_cfg('git-path').";".
 	     " if test -d $package.git; then echo 1; else echo 0; fi");
-	die "$r $! $?" unless $r =~ m/^[01]$/;
+	my $r= cmdoutput @cmd;
+	failedcmd @cmd unless $r =~ m/^[01]$/;
 	return $r+0;
     } else {
-	die "unknown git-check $how ?";
+	badcfg "unknown git-check \`$how'";
     }
 }
 
@@ -376,7 +417,7 @@ sub create_remote_git_repo () {
 	     " cd $package.git;".
 	     " if ! test -d objects; then git init --bare; fi");
     } else {
-	die "unknown git-create $how ?";
+	badcfg "unknown git-create \`$how'";
     }
 }
 
@@ -410,7 +451,8 @@ sub mktree_in_ud_from_only_subdir () {
 
 sub dsc_files () {
     map {
-	m/^\w+ \d+ (\S+)$/ or die "$_ ?";
+	m/^\w+ \d+ (\S+)$/ or
+	    fail "could not parse .dsc Files/Checksums line \`$_'";
 	$1;
     } grep m/\S/, split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files});
 }
@@ -430,7 +472,7 @@ sub generate_commit_from_dsc () {
     chdir $ud or die $!;
     my @files;
     foreach my $f (dsc_files()) {
-	die if $f =~ m#/|^\.|\.dsc$|\.tmp$#;
+	die "$f ?" if $f =~ m#/|^\.|\.dsc$|\.tmp$#;
 	push @files, $f;
 	link "../../../$f", $f
 	    or $!==&ENOENT
@@ -444,12 +486,14 @@ sub generate_commit_from_dsc () {
     }
     my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     runcmd qw(sh -ec), 'dpkg-parsechangelog >../changelog.tmp';
-    my $clogp = parsecontrol('../changelog.tmp','changelog') or die;
+    my $clogp = parsecontrol('../changelog.tmp',"commit's changelog");
     my $date = cmdoutput qw(date), '+%s %z', qw(-d),$clogp->{Date};
     my $author = $clogp->{Maintainer};
     $author =~ s#,.*##ms;
     my $authline = "$author $date";
-    $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or die $authline;
+    $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or
+	fail "unexpected commit author line format \`$authline'".
+	    " (was generated from changelog Maintainer field)";
     open C, ">../commit.tmp" or die $!;
     print C <<END or die $!;
 tree $tree
@@ -467,7 +511,7 @@ END
 	runcmd @git, qw(reset --hard), $upload_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
 	my $oldclogp = Dpkg::Control::Hash->new();
-	$oldclogp->load('../changelogold.tmp','previous changelog') or die;
+	$oldclogp->load('../changelogold.tmp','previous changelog');
 	my $vcmp =
 	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
 	if ($vcmp < 0) {
@@ -491,10 +535,10 @@ Perhaps the upload is stuck in incoming.  Using the version from git.
 END
             $outputhash = $upload_hash;
 	} elsif ($outputhash ne $upload_hash) {
-	    die "version in archive ($clogp->{Version})".
+	    fail "version in archive ($clogp->{Version})".
 		" is same as version in git".
 		" to-be-uploaded (upload/) branch ($oldclogp->{Version})".
-		" but archive version hash no commit hash?!\n";
+		" but archive version hash no commit hash?!";
         }
     }
     chdir '../../../..' or die $!;
@@ -535,7 +579,7 @@ sub is_fast_fwd ($$) {
 }
 
 sub git_fetch_us () {
-    die "cannot dry run with fetch" if $dryrun;
+    badusage "cannot dry run with fetch" if $dryrun;
     runcmd @git, qw(fetch),access_giturl(),fetchspec();
 }
 
@@ -543,9 +587,9 @@ sub fetch_from_archive () {
     # ensures that lrref() is what is actually in the archive,
     #  one way or another
     get_archive_dsc() or return 0;
-    $dsc_hash = $dsc->{$ourdscfield};
+    defined($dsc_hash = $dsc->{$ourdscfield}) or die;
     if (defined $dsc_hash) {
-	$dsc_hash =~ m/\w+/ or die "$dsc_hash $?";
+	$dsc_hash =~ m/\w+/ or fail "invalid hash in .dsc \`$dsc_hash'";
 	$dsc_hash = $&;
 	print "last upload to archive specified git hash\n";
     } else {
@@ -565,7 +609,8 @@ sub fetch_from_archive () {
     print DEBUG "previous reference hash $upload_hash\n";
     my $hash;
     if (defined $dsc_hash) {
-	die "missing git history even though dsc has hash"
+	fail "missing git history even though dsc has hash -"
+	    " could not find commit $dsc_hash"
 	    unless $upload_hash;
 	$hash = $dsc_hash;
 	ensure_we_have_orig();
@@ -574,7 +619,7 @@ sub fetch_from_archive () {
     }
     print DEBUG "current hash $hash\n";
     if ($upload_hash) {
-	die "not fast forward on last upload branch!".
+	fail "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
 	    unless is_fast_fwd($upload_hash, $hash);
     }
@@ -592,7 +637,7 @@ sub fetch_from_archive () {
 sub clone ($) {
     my ($dstdir) = @_;
     canonicalise_suite();
-    die "dry run makes no sense with clone" if $dryrun;
+    badusage "dry run makes no sense with clone" if $dryrun;
     mkdir $dstdir or die "$dstdir $!";
     chdir "$dstdir" or die "$dstdir $!";
     runcmd @git, qw(init -q);
@@ -608,7 +653,7 @@ sub clone ($) {
     } else {
 	print "starting new git history\n";
     }
-    fetch_from_archive() or die;
+    fetch_from_archive() or no_such_package;
     runcmd @git, qw(reset --hard), lrref();
     printdone "ready for work in $dstdir";
 }
@@ -617,7 +662,7 @@ sub fetch () {
     if (check_for_git()) {
 	git_fetch_us();
     }
-    fetch_from_archive() or die;
+    fetch_from_archive() or no_such_package();
     printdone "fetched into ".lrref();
 }
 
@@ -657,7 +702,9 @@ sub dopush () {
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
     my $dscfn = "${package}_$clogp->{Version}.dsc";
-    stat "../$dscfn" or die "$dscfn $!";
+    stat "../$dscfn" or
+	fail "looked for .dsc $dscfn, but $!;".
+	    " maybe you forgot to build";
     $dsc = parsecontrol("../$dscfn");
     print DEBUG "format $dsc->{Format}\n";
     if ($dsc->{Format} eq '3.0 (quilt)') {
@@ -671,7 +718,17 @@ sub dopush () {
     runcmd qw(dpkg-source -x --), "../../../../$dscfn";
     my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     chdir '../../../..' or die $!;
-    runcmd @git, qw(diff --exit-code), $tree;
+    printcmd \@DEBUG,"+",@_;
+    my @diffcmd = (@git, qw(diff --exit-code), $tree);
+    $!=0; $?=0;
+    if (system @diffcmd) {
+	if ($! && $?==256) {
+	    fail "$dscfn specifies a different tree to your HEAD commit;".
+		" perhaps you forgot to build";
+	} else {
+	    failedcmd @diffcmd;
+	}
+    }
 #fetch from alioth
 #do fast forward check and maybe fake merge
 #    if (!is_fast_fwd(mainbranch
@@ -686,9 +743,11 @@ sub dopush () {
 	print "[new .dsc left in $dscfn.tmp]\n";
     }
     if (!$changesfile) {
-	my $pat = "../${package}_$clogp->{Version}_*.changes";
-	my @cs = glob $pat;
-        die "$pat ?" unless @cs==1;
+	my $pat = "${package}_$clogp->{Version}_*.changes";
+	my @cs = glob "../$pat";
+	fail "failed to find unique changes file".
+	    " (looked for $pat in ..); perhaps you need to use dgit -C"
+	    unless @cs==1;
 	($changesfile) = @cs;
     }
     my $tag = debiantag($dsc->{Version});
@@ -717,7 +776,8 @@ sub dopush () {
 sub cmd_clone {
     parseopts();
     my $dstdir;
-    die if defined $package;
+    badusage "-p is not allowed with clone; specify as argument instead"
+	if defined $package;
     if (@ARGV==1) {
 	($package) = @ARGV;
     } elsif (@ARGV==2 && $ARGV[1] =~ m#^\w#) {
@@ -727,7 +787,7 @@ sub cmd_clone {
     } elsif (@ARGV==3) {
 	($package,$isuite,$dstdir) = @ARGV;
     } else {
-	die;
+	badusage "incorrect arguments to dgit clone";
     }
     $dstdir ||= "$package";
     clone($dstdir);
@@ -759,7 +819,7 @@ sub fetchpullargs () {
 	($isuite) = @ARGV;
 	canonicalise_suite();
     } else {
-	die;
+	badusage "incorrect arguments to dgit fetch or dgit pull";
     }
 }
 
@@ -777,7 +837,7 @@ sub cmd_pull {
 
 sub cmd_push {
     parseopts();
-    die if defined $package;
+    badusage "-p is not allowed with dgit push" if defined $package;
     runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
     $package = $clogp->{Source};
@@ -788,19 +848,20 @@ sub cmd_push {
 	    canonicalise_suite();
 	}
     } else {
-	die;
+	badusage "incorrect arguments to dgit push";
     }
     if (fetch_from_archive()) {
 	is_fast_fwd(lrref(), 'HEAD') or die;
     } else {
-	die unless $new_package;
+	fail "package appears to be new in this suite;".
+	    " if this is intentional, use --new";
     }
     dopush();
 }
 
 sub cmd_build {
     # we pass further options and args to git-buildpackage
-    die if defined $package;
+    badusage "-p is not allowed with dgit build" if defined $package;
     my $clogp = parsechangelog();
     $isuite = $clogp->{Distribution};
     $package = $clogp->{Source};
@@ -815,7 +876,7 @@ sub cmd_build {
 }
 
 sub cmd_quilt_fixup {
-    die if @ARGV;
+    badusage "incorrect arguments to dgit quilt-fixup";
     my $clogp = parsechangelog();
     commit_quilty_patch($clogp->{Version});
 }
@@ -842,7 +903,7 @@ sub parseopts () {
 	    } elsif (m/^--existing-package=(.*)/s) {
 		$existing_package = $1;
 	    } else {
-		die "$_ ?";
+		badusage "unknown long option \`$_'";
 	    }
 	} else {
 	    while (m/^-./s) {
@@ -862,7 +923,7 @@ sub parseopts () {
 		} elsif (s/^-k(.*)//s) {
 		    $keyid=$1;
 		} else {
-		    die "$_ ?";
+		    badusage "unknown shorrt option \`$_'";
 		}
 	    }
 	}
