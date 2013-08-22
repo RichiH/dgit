@@ -321,6 +321,27 @@ or
 .BR mergechanges .
 Can be repeated as necessary.
 .TP
+.BR -d "\fIdistro\fR | " --distro= \fIdistro\fR
+Specifies that the suite to be operated on is part of distro
+.IR distro .
+This overrides the default value found from the git config option
+.BR dgit-suite. \fIsuite\fR .distro .
+The only effect is that other configuration variables (used
+for accessing the archive and dgit-repos) used are
+.BR dgit-distro. \fIdistro\fR .* .
+
+If your suite is part of a distro that dgit already knows about, you
+can use this option to make dgit work even if your dgit doesn't know
+about the suite.  For example, specifying
+.B -ddebian
+will work when the suite is an unknown suite in the Debian archive.
+
+To define a new distro it is necessary to define methods and URLs
+for fetching (and, for dgit push, altering) a variety of information both
+in the archive and in dgit-repos.  How to do this is not yet
+documented, and currently the arrangements are unpleasant.  See
+BUGS.
+.TP
 .BI -C changesfile
 Specifies the .changes file which is to be uploaded.  By default
 dgit push looks for single .changes file in the parent directory whose

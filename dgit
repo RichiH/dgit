@@ -28,6 +28,7 @@ use Dpkg::Version;
 use POSIX;
 
 our $isuite = 'unstable';
+our $idistro;
 our $package;
 
 our $sign = 1;
@@ -246,7 +247,7 @@ sub access_distro () {
 
 sub access_cfg (@) {
     my (@keys) = @_;
-    my $distro = access_distro();
+    my $distro = $idistro || access_distro();
     my $value = cfg(map { ("dgit-distro.$distro.$_",
 			   "dgit.default.$_") } @keys);
     return $value;
@@ -978,6 +979,8 @@ sub parseopts () {
 		push @$om, $2;
 	    } elsif (m/^--existing-package=(.*)/s) {
 		$existing_package = $1;
+	    } elsif (m/^--distro=(.*)/s) {
+		$idistro = $1;
 	    } else {
 		badusage "unknown long option \`$_'";
 	    }
@@ -994,6 +997,8 @@ sub parseopts () {
 		    $new_package=1;
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, '-c', $1;
+		} elsif (s/^-d(.*)//s) {
+		    $idistro = $1;
 		} elsif (s/^-C(.*)//s) {
 		    $changesfile = $1;
 		} elsif (s/^-k(.*)//s) {
