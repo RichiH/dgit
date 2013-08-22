@@ -761,11 +761,6 @@ sub dopush () {
 #        (uploadbranch());
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
-    if (!$dryrun) {
-	rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
-    } else {
-	print "[new .dsc left in $dscfn.tmp]\n";
-    }
     if (!$changesfile) {
 	my $pat = "${package}_c$version_*.changes";
 	my @cs = glob "../$pat";
@@ -779,6 +774,11 @@ sub dopush () {
 	create_remote_git_repo();
     }
     runcmd_ordryrun @git, qw(push),access_giturl(),"HEAD:".rrref();
+    if (!$dryrun) {
+	rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
+    } else {
+	print "[new .dsc left in $dscfn.tmp]\n";
+    }
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
 		       "Release $dversion for $csuite [dgit]");

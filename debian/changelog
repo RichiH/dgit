@@ -7,6 +7,7 @@ dgit (0.4) experimental; urgency=low
   * Much better error messages.
   * Better error checking when parsing RFC822-style control data.
   * Better checking that the supplied .dsc and debian/changes correspond.
+  * Ordering improvement in push: don't add dsc field until git push done.
 
  --
 
