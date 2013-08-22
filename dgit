@@ -104,6 +104,7 @@ sub url_get {
     my $what = $_[$#_];
     print "downloading $what...\n";
     my $r = $ua->get(@_) or die $!;
+    return undef if $r->code == 404;
     $r->is_success or fail "failed to fetch $what: ".$r->status_line;
     return $r->decoded_content();
 }
@@ -372,26 +373,27 @@ sub canonicalise_suite_sshdakls ($$) {
 
 sub madison_parse ($) {
     my ($rmad) = @_;
-    if (!length $rmad) {
-	return ();
+    my @out;
+    foreach my $l (split /\n/, $rmad) {
+	$l =~ m{^ \s*( [^ \t|]+ )\s* \|
+                  \s*( [^ \t|]+ )\s* \|
+                  \s*( [^ \t|/]+ )(?:/([^ \t|/]+))? \s* \|
+                  \s*( [^ \t|]+ )\s* }x or die "$rmad $?";
+	$1 eq $package or die "$rmad $package ?";
+	my $vsn = $2;
+	my $newsuite = $3;
+	my $component;
+	if (defined $4) {
+	    $component = $4;
+	} else {
+	    $component = access_cfg('archive-query-default-component');
+	}
+	$5 eq 'source' or die "$rmad ?";
+	my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
+	my $subpath = "/pool/$component/$prefix/$package/${package}_$vsn.dsc";
+	push @out, [$vsn,$subpath,$newsuite];
     }
-    $rmad =~ m{^ \s*( [^ \t|]+ )\s* \|
-                 \s*( [^ \t|]+ )\s* \|
-                 \s*( [^ \t|/]+ )(?:/([^ \t|/]+))? \s* \|
-                 \s*( [^ \t|]+ )\s* }x or die "$rmad $?";
-    $1 eq $package or die "$rmad $package ?";
-    my $vsn = $2;
-    my $newsuite = $3;
-    my $component;
-    if (defined $4) {
-	$component = $4;
-    } else {
-	$component = access_cfg('archive-query-default-component');
-    }
-    $5 eq 'source' or die "$rmad ?";
-    my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
-    my $subpath = "/pool/$component/$prefix/$package/${package}_$vsn.dsc";
-    return ($vsn,$subpath,$newsuite);
+    return sort { -version_compare_string($a->[0],$b->[0]); } @out;
 }
 
 sub canonicalise_suite_madison ($$) {
@@ -400,7 +402,7 @@ sub canonicalise_suite_madison ($$) {
 	"unable to canonicalise suite using package $package".
 	" which does not appear to exist in suite $isuite;".
 	" --existing-package may help";
-    return $r[2];
+    return $r[0][2];
 }
 
 sub canonicalise_suite () {
@@ -412,17 +414,24 @@ sub canonicalise_suite () {
 }
 
 sub get_archive_dsc () {
-    my ($vsn,$subpath) = archive_query('archive_query');
     canonicalise_suite();
-    if (!defined $vsn) { $dsc=undef; return undef; }
-    $dscurl = access_cfg('mirror').$subpath;
-    $dscdata = url_get($dscurl);
-    my $dscfh = new IO::File \$dscdata, '<' or die $!;
-    print DEBUG Dumper($dscdata) if $debug>1;
-    $dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);
-    print DEBUG Dumper($dsc) if $debug>1;
-    my $fmt = getfield $dsc, 'Format';
-    fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
+    my @vsns = archive_query('archive_query');
+    foreach my $vinfo (@vsns) {
+	my ($vsn,$subpath) = @$vinfo;
+	$dscurl = access_cfg('mirror').$subpath;
+	$dscdata = url_get($dscurl);
+	next unless defined $dscdata;
+	$dscurl = access_cfg('mirror').$subpath;
+	$dscdata = url_get($dscurl);
+	my $dscfh = new IO::File \$dscdata, '<' or die $!;
+	print DEBUG Dumper($dscdata) if $debug>1;
+	$dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);
+	print DEBUG Dumper($dsc) if $debug>1;
+	my $fmt = getfield $dsc, 'Format';
+	fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
+	return $dsc;
+    }
+    return undef;
 }
 
 sub check_for_git () {
