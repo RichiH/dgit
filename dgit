@@ -86,9 +86,10 @@ sub url_get {
 	$ua = LWP::UserAgent->new();
 	$ua->env_proxy;
     }
-    print "downloading @_...\n";
+    my $what = $_[$#_];
+    print "downloading $what...\n";
     my $r = $ua->get(@_) or die $!;
-    fail $r->status_line."; failed." unless $r->is_success;
+    $r->is_success or fail "failed to fetch $what: ".$r->status_line;
     return $r->decoded_content();
 }
 
@@ -111,9 +112,8 @@ sub printcmd {
 }
 
 sub failedcmd {
-    my $errnoval = $!;
-    printcmd \*STDERR, "$_[0]: failed command:", @_;
-    if ($errnoval) {
+    { local ($!); printcmd \*STDERR, "$_[0]: failed command:", @_ or die $!; };
+    if ($!) {
 	fail "failed to fork/exec: $!";
     } elsif (!($? & 0xff)) {
 	fail "subprocess failed with error exit status ".($?>>8);
@@ -263,11 +263,16 @@ sub access_giturl () {
     return "$url/$package.git";
 }	       
 
+sub parsecontrolfh ($$@) {
+    my ($fh, $desc, @opts) = @_;
+    my $c = Dpkg::Control::Hash->new({ 'name' => $desc, @opts });
+    $c->parse($fh) or die "parsing of $desc failed";
+}
+
 sub parsecontrol {
     my ($file, $desc) = @_;
-    my $c = Dpkg::Control::Hash->new({ 'name' => $desc });
     my $fh = new IO::File '<', $file or die "$file: $!";
-    $c->parse($fh) or die "parsing of $desc failed";
+    my $c = parsecontrolfh($fh,$desc);
     $fh->error and die $!;
     close $fh;
     return $c;
@@ -362,7 +367,7 @@ sub madison_parse ($) {
 sub canonicalise_suite_madison ($$) {
     my @r = archive_query_madison($_[0],$_[1]);
     @r or fail
-	"unable to canonialise suite using package $package".
+	"unable to canonicalise suite using package $package".
 	" which does not appear to exist in suite $suite;".
 	" --existing-package may help";
     return $r[2];
@@ -384,8 +389,7 @@ sub get_archive_dsc () {
     $dscdata = url_get($dscurl);
     my $dscfh = new IO::File \$dscdata, '<' or die $!;
     print DEBUG Dumper($dscdata) if $debug>1;
-    $dsc = Dpkg::Control::Hash->new(allow_pgp=>1);
-    $dsc->parse($dscfh, 'dsc') or fail "parsing of $dscurl failed";
+    $dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);
     print DEBUG Dumper($dsc) if $debug>1;
     my $fmt = $dsc->{Format};
     fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
@@ -510,8 +514,7 @@ END
     if ($upload_hash) {
 	runcmd @git, qw(reset --hard), $upload_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
-	my $oldclogp = Dpkg::Control::Hash->new();
-	$oldclogp->load('../changelogold.tmp','previous changelog');
+	my $oldclogp = parsecontrol('../changelogold.tmp','previous changelog');
 	my $vcmp =
 	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
 	if ($vcmp < 0) {
@@ -587,7 +590,7 @@ sub fetch_from_archive () {
     # ensures that lrref() is what is actually in the archive,
     #  one way or another
     get_archive_dsc() or return 0;
-    defined($dsc_hash = $dsc->{$ourdscfield}) or die;
+    $dsc_hash = $dsc->{$ourdscfield};
     if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or fail "invalid hash in .dsc \`$dsc_hash'";
 	$dsc_hash = $&;
@@ -611,6 +614,7 @@ sub fetch_from_archive () {
     if (defined $dsc_hash) {
 	fail "missing git history even though dsc has hash -"
 	    " could not find commit $dsc_hash"
+	    " (should be in ".access_giturl()."#".rref().")";
 	    unless $upload_hash;
 	$hash = $dsc_hash;
 	ensure_we_have_orig();
@@ -705,7 +709,7 @@ sub dopush () {
     stat "../$dscfn" or
 	fail "looked for .dsc $dscfn, but $!;".
 	    " maybe you forgot to build";
-    $dsc = parsecontrol("../$dscfn");
+    $dsc = parsecontrol("../$dscfn","$dscfn");
     print DEBUG "format $dsc->{Format}\n";
     if ($dsc->{Format} eq '3.0 (quilt)') {
 	print "Format \`$dsc->{Format}', urgh\n";
@@ -804,7 +808,7 @@ sub branchsuite () {
 
 sub fetchpullargs () {
     if (!defined $package) {
-	my $sourcep = parsecontrol('debian/control');
+	my $sourcep = parsecontrol('debian/control','debian/control');
 	$package = $sourcep->{Source};
     }
     if (@ARGV==0) {
@@ -923,7 +927,7 @@ sub parseopts () {
 		} elsif (s/^-k(.*)//s) {
 		    $keyid=$1;
 		} else {
-		    badusage "unknown shorrt option \`$_'";
+		    badusage "unknown short option \`$_'";
 		}
 	    }
 	}
