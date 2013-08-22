@@ -65,7 +65,7 @@ belongs.
 Consults the archive and git-repos to update the git view of
 history for a specific suite (and downloads any necessary orig
 tarballs), and updates the remote tracking branch
-.BR remotes/dgit/ \fIsuite\fR.
+.BR remotes/dgit/dgit/ \fIsuite\fR.
 If the current branch is
 .BI dgit/ suite
 then dgit fetch defaults to
@@ -76,7 +76,7 @@ there.
 \fBdgit pull\fR [\fIsuite\fP]
 Does dgit fetch, and then merges the new head of the remote tracking
 branch
-.BI remotes/dgit/ suite
+.BI remotes/dgit/dgit/ suite
 into the current branch.
 .TP
 \fBdgit build\fR ...
@@ -140,7 +140,7 @@ and then dgit push.  You can use whatever gitish techniques you like
 to construct the commit to push; the only requirement is that it is a
 descendant of the state of the archive, as provided by dgit in the
 remote tracking branch
-.BR remotes/dgit/ \fIsuite\fR.
+.BR remotes/dgit/dgit/ \fIsuite\fR.
 
 If you are lucky the other uploaders have also used dgit and
 integrated the other relevant git history; if not you can fetch it
@@ -175,13 +175,13 @@ to start using dgit.  First, do
 .B dgit fetch
 (or clone) to obtain a git history representation of what's in the
 archive and record it in the
-.BI remotes/dgit/ suite
+.BI remotes/dgit/dgit/ suite
 tracking branch.  Then somehow, using your other git history
 plus appropriate diffs and cherry picks from the dgit remote tracking
 branch, construct a git commit whose tree corresponds to the tree to use for the
 next upload.  If that commit-to-be-uploaded is not a descendant of the
 dig remote tracking branch, check it out and say
-.BR "git merge -s ours remotes/dgit/" \fIsuite\fR;
+.BR "git merge -s ours remotes/dgit/dgit/" \fIsuite\fR;
 that tells git that we are deliberately throwing away any differences
 between what's in the archive and what you intend to upload.
 Then run

@@ -1,6 +1,8 @@
 dgit (0.7) unstable; urgency=low
 
   * Manpage formatting fix.
+  * Name the local remote tracking branch remotes/dgit/dgit/<suite>
+    so that we avoid a warning from git about ambiguous branch names.
 
  --
 

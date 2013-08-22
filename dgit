@@ -68,7 +68,7 @@ our $csuite;
 sub lbranch () { return "$branchprefix/$csuite"; }
 my $lbranch_re = '^refs/heads/'.$branchprefix.'/([^/.]+)$';
 sub lref () { return "refs/heads/".lbranch(); }
-sub lrref () { return "refs/remotes/$remotename/$csuite"; }
+sub lrref () { return "refs/remotes/$remotename/$branchprefix/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { 
     my ($v) = @_;
