@@ -118,6 +118,9 @@ dgit quilt-fixup.
 
 dgit push always uses the package, suite and version specified in the
 debian/changelog and the .dsc, which must agree.
+
+If dgit push fails while uploading, it is fine to simply retry the
+dput on the .changes file at your leisure.
 .TP
 .B dgit quilt-fixup
 Looks to see if there is quilt patch metadata left over by dpkg-source
