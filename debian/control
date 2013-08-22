@@ -9,6 +9,7 @@ Package: dgit
 Depends: perl, libwww-perl, libdpkg-perl, git-core, devscripts, dpkg-dev,
          ${misc:Depends}
 Recommends: ssh-client
+Suggests: sbuild
 Architecture: all
 Description: git interoperability with the Debian archive
  dgit (with the associated infrastructure) makes it possible to
