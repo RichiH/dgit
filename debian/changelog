@@ -1,3 +1,10 @@
+dgit (0.5) unstable; urgency=low
+
+  * Upload to unstable, as this version mostly works.  (All the RC
+    bugs of which I'm aware are now properly represented in the BTS.)
+
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Thu, 22 Aug 2013 15:38:00 +0100
+
 dgit (0.4~pre2) experimental; urgency=low
 
   * Mangle debian/<version> tags the way git-buildpackage does
