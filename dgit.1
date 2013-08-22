@@ -32,6 +32,10 @@ as
 .B dgit-repos
 which lives outside the Debian archive (currently, on Alioth).
 
+The usual workflow is: 1. clone or fetch; 2. make and commit changes
+in git as desired; 3. run dgit build or dgit sbuild, or generate the
+source and binary packages for upload some other way; 4. do
+pre-upload tests of the proposed upload; 5. run dgit push.
 .TP
 \fBdgit clone\fR \fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir]
 Consults the archive and dgit-repos to construct the git view of
