@@ -815,6 +815,9 @@ sub dopush () {
 	print "[new .dsc left in $dscfn.tmp]\n";
     }
     if ($sign) {
+	if (!defined $keyid) {
+	    $keyid = access_cfg('keyid','RETURN-UNDEF');
+	}
 	my @tag_cmd = (@git, qw(tag -s -m),
 		       "Release $dversion for $csuite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;

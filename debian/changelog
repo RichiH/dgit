@@ -2,6 +2,7 @@ dgit (0.4~pre2) experimental; urgency=low
 
   * Mangle debian/<version> tags the way git-buildpackage does
     (as of git-buildpackage 0.5.5, 3c6bbd0f4992f8da).
+  * Support dgit-distro.<distro>.keyid config option.
 
  --
 
