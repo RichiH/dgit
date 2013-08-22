@@ -4,6 +4,7 @@ dgit (0.4) experimental; urgency=low
   * Usage message.  Closes #720085.
   * Assorted manpage fixes.
   * Fail if a required config item is missing.
+  * Much better error messages.
 
  --
 
