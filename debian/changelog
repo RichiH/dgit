@@ -6,7 +6,7 @@ dgit (0.7) unstable; urgency=low
   * Name the local remote tracking branch remotes/dgit/dgit/<suite>
     so that we avoid a warning from git about ambiguous branch names.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Thu, 22 Aug 2013 18:29:10 +0100
 
 dgit (0.6) unstable; urgency=low
 
