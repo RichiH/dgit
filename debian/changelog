@@ -7,7 +7,7 @@ dgit (0.4~pre2) experimental; urgency=low
     is to something with no write access to the fs and the new CNAME
     has not yet been set up.  This reintroduces #720172 :-/.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Thu, 22 Aug 2013 15:31:17 +0100
 
 dgit (0.4~pre1) experimental; urgency=low
 
