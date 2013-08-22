@@ -701,7 +701,7 @@ sub pull () {
 }
 
 sub check_not_dirty () {
-    runcmd @git, qw(diff --quiet);
+    runcmd @git, qw(diff --quiet HEAD);
 }
 
 sub commit_quilty_patch ($) {
