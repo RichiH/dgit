@@ -1,0 +1,5 @@
+manpage better descriptions
+die on config missing
+distro option
+autocommit not on HEAD, optionally
+field access error checks

@@ -281,7 +281,7 @@ sub parsecontrol {
 sub parsechangelog {
     my $c = Dpkg::Control::Hash->new();
     my $p = new IO::Handle;
-    my @cmd = qw(dpkg-parsechangelog);
+    my @cmd = (qw(dpkg-parsechangelog));
     open $p, '-|', @cmd or die $!;
     $c->parse($p);
     $?=0; $!=0; close $p or failedcmd @cmd;
@@ -329,12 +329,12 @@ sub archive_query_sshdakls ($$) {
 sub canonicalise_suite_sshdakls ($$) {
     my ($proto,$data) = @_;
     $data =~ m/:/ or badcfg "invalid sshdakls method string \`$data'";
-    my @cmd = 
-	access_cfg('ssh'), $`,
-	"set -e; cd $';".
-	" if test -h $isuite; then readlink $isuite; exit 0; fi;".
-	" if test -d $isuite; then echo $isuite; exit 0; fi;".
-	" exit 1";
+    my @cmd =
+	(access_cfg('ssh'), $`,
+	 "set -e; cd $';".
+	 " if test -h $isuite; then readlink $isuite; exit 0; fi;".
+	 " if test -d $isuite; then echo $isuite; exit 0; fi;".
+	 " exit 1");
     my $dakls = cmdoutput @cmd;
     failedcmd @cmd unless $dakls =~ m/^\w/;
     return $dakls;
