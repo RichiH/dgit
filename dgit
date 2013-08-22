@@ -51,7 +51,7 @@ our %opts_opt_map = ('dget' => \@dget,
 		     'dput' => \@dput,
 		     'debsign' => \@debsign,
                      'sbuild' => \@sbuild,
-                     'dpkg-buildpackage' => \@dpkgbuildpackage;
+                     'dpkg-buildpackage' => \@dpkgbuildpackage,
                      'mergechanges' => \@mergechanges);
 
 our $keyid;
@@ -71,16 +71,16 @@ sub lrref () { return "refs/remotes/$remotename/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
 
-sub dscfn () { return "${package}_${cversion}.dsc"; }
+sub dscfn ($) { return "${package}_${1}.dsc"; }
 
 our $us = 'dgit';
 
-sub fail () { die "$us: @_\n"; }
+sub fail { die "$us: @_\n"; }
 
-sub badcfg () { print STDERR "$us: invalid configuration: @_\n"; exit 12; }
+sub badcfg { print STDERR "$us: invalid configuration: @_\n"; exit 12; }
 
 sub no_such_package () {
-    print STDERR "$us: package $package does not exist in suite $suite\n";
+    print STDERR "$us: package $package does not exist in suite $isuite\n";
     exit 4;
 }
 
@@ -386,7 +386,7 @@ sub canonicalise_suite_madison ($$) {
     my @r = archive_query_madison($_[0],$_[1]);
     @r or fail
 	"unable to canonicalise suite using package $package".
-	" which does not appear to exist in suite $suite;".
+	" which does not appear to exist in suite $isuite;".
 	" --existing-package may help";
     return $r[2];
 }
@@ -409,7 +409,7 @@ sub get_archive_dsc () {
     print DEBUG Dumper($dscdata) if $debug>1;
     $dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);
     print DEBUG Dumper($dsc) if $debug>1;
-    my $fmt = getfield $dsc 'Format';
+    my $fmt = getfield $dsc, 'Format';
     fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
 }
 
@@ -525,7 +525,7 @@ tree $tree
 author $authline
 committer $authline
 
-$chhanges
+$changes
 
 # imported from the archive
 END
@@ -635,9 +635,9 @@ sub fetch_from_archive () {
     print DEBUG "previous reference hash $upload_hash\n";
     my $hash;
     if (defined $dsc_hash) {
-	fail "missing git history even though dsc has hash -"
-	    " could not find commit $dsc_hash"
-	    " (should be in ".access_giturl()."#".rref().")";
+	fail "missing git history even though dsc has hash -".
+	    " could not find commit $dsc_hash".
+	    " (should be in ".access_giturl()."#".rref().")"
 	    unless $upload_hash;
 	$hash = $dsc_hash;
 	ensure_we_have_orig();
@@ -727,9 +727,9 @@ sub commit_quilty_patch ($) {
 sub dopush () {
     print DEBUG "actually entering push\n";
     my $clogp = parsechangelog();
-    $package = getfield $clogp 'Source';
+    $package = getfield $clogp, 'Source';
     my $cversion = getfield $clogp, 'Version';
-    my $dscfn = dscfn();
+    my $dscfn = dscfn($cversion);
     stat "../$dscfn" or
 	fail "looked for .dsc $dscfn, but $!;".
 	    " maybe you forgot to build";
@@ -737,7 +737,7 @@ sub dopush () {
     my $dscpackage = getfield $dsc, 'Source';
     my $format = getfield $dsc, 'Format';
     my $dversion = getfield $dsc, 'Version';
-    ($dscpackage eq $package && $dversion eq $cversion)
+    ($dscpackage eq $package && $dversion eq $cversion) or
 	fail "$dsc is for $dscpackage $dversion".
 	    " but debian/changelog is for $package $cversion";
     print DEBUG "format $format\n";
@@ -752,7 +752,7 @@ sub dopush () {
     runcmd qw(dpkg-source -x --), "../../../../$dscfn";
     my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     chdir '../../../..' or die $!;
-    printcmd \@DEBUG,"+",@_;
+    printcmd \*DEBUG,"+",@_;
     my @diffcmd = (@git, qw(diff --exit-code), $tree);
     $!=0; $?=0;
     if (system @diffcmd) {
@@ -925,7 +925,7 @@ sub cmd_sbuild {
     runcmd (@dpkgbuildpackage, qw(-us -uc -S));
     chdir ".." or die $!;
     my $sourcechanges = "${package}_${version}_source.changes";
-    my $dscfn = dscfn();
+    my $dscfn = dscfn($version);
     stat "../$dscfn" or fail "$dscfn (in parent directory): $!";
     stat "../$sourcechanges" or fail "$sourcechanges (in parent directory): $!";
     my $pat = "${package}_${version}_*.changes";
@@ -943,7 +943,7 @@ sub cmd_sbuild {
 sub cmd_quilt_fixup {
     badusage "incorrect arguments to dgit quilt-fixup";
     my $clogp = parsechangelog();
-    commit_quilty_patch((getfield $clogp, Version));
+    commit_quilty_patch((getfield $clogp, 'Version'));
 }
 
 sub parseopts () {
