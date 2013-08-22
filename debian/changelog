@@ -1,3 +1,10 @@
+dgit (0.6) unstable; urgency=low
+
+  * Allow fetching when archive has out-of-date git hash in .dsc.
+    Closes: #720490.
+
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Thu, 22 Aug 2013 16:02:10 +0100
+
 dgit (0.5) unstable; urgency=low
 
   * Upload to unstable, as this version mostly works.  (All the RC

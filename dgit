@@ -200,6 +200,10 @@ important dgit options:
   -c<name>=<value>    set git config option (used directly by dgit too)
 END
 
+our $later_warning_msg = <<END;
+Perhaps the upload is stuck in incoming.  Using the version from git.
+END
+
 sub badusage {
     print STDERR "$us: @_\n", $helpmsg or die $!;
     exit 8;
@@ -565,9 +569,10 @@ END
             $outputhash = make_commit qw(../commit2.tmp);
 	} elsif ($vcmp > 0) {
 	    print STDERR <<END or die $!;
+
 Version actually in archive:    $cversion (older)
 Last allegedly pushed/uploaded: $oversion (newer or same)
-Perhaps the upload is stuck in incoming.  Using the version from git.
+$later_warning_msg
 END
             $outputhash = $upload_hash;
 	} elsif ($outputhash ne $upload_hash) {
@@ -651,6 +656,16 @@ sub fetch_from_archive () {
 	    unless $upload_hash;
 	$hash = $dsc_hash;
 	ensure_we_have_orig();
+	if (is_fast_fwd($dsc_hash,$upload_hash)) {
+	    print STDERR <<END or die $!;
+
+Git commit in archive is behind the last version allegedly pushed/uploaded.
+Commit referred to by archive:  $dsc_hash
+Last allegedly pushed/uploaded: $upload_hash
+$later_warning_msg
+END
+	    $hash = $upload_hash;
+	}
     } else {
 	$hash = generate_commit_from_dsc();
     }
