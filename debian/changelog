@@ -3,6 +3,9 @@ dgit (0.4~pre2) experimental; urgency=low
   * Mangle debian/<version> tags the way git-buildpackage does
     (as of git-buildpackage 0.5.5, 3c6bbd0f4992f8da).
   * Support dgit-distro.<distro>.keyid config option.
+  * Revert change to ssh to alioth CNAME, as the recommended CNAME
+    is to something with no write access to the fs and the new CNAME
+    has not yet been set up.  This reintroduces #720172 :-/.
 
  --
 
