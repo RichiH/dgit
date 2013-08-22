@@ -6,6 +6,7 @@ dgit (0.4) experimental; urgency=low
   * Fail if a required config item is missing.
   * Much better error messages.
   * Better error checking when parsing RFC822-style control data.
+  * Better checking that the supplied .dsc and debian/changes correspond.
 
  --
 
