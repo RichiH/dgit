@@ -2,7 +2,7 @@ dgit (0.4) experimental; urgency=low
 
   * Use dgit.debian.net vhost on alioth.  Closes #720172.
   * Usage message.  Closes #720085.
-  * Assorted manpage fixes.
+  * Assorted manpage fixes and improvements.
   * Fail if a required config item is missing.
   * Much better error messages.
   * Better error checking when parsing RFC822-style control data.
