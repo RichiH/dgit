@@ -12,8 +12,8 @@ dgit \- git integration with the Debian archive
 [\fIsuite\fP]
 .br
 .B dgit
-[\fIdgit\-opts\fP] \fBbuild\fP
-[\fIgit\-buildpackage\-opts\fP|\fIdpkg\-buildpackage\-opts\fp]
+[\fIdgit\-opts\fP] \fBbuild\fP|\fBsbuild\fP
+[\fIbuild\-opts\fp]
 .br
 .B dgit
 [\fIdgit\-opts\fP] \fBpush\fP [\fIdgit\-opts\fP]
@@ -78,12 +78,20 @@ into the current branch.
 \fBdgit build\fR ...
 Runs
 .B git-buildpackage
-with some suitable options.  Options and argumments after
-.B build
+with some suitable options.  Options and argumments after build
 will be passed on to git-buildpackage.  It is not necessary to use
 dgit build when using dgit; it is OK to use any approach which ensures
 that the generated source package corresponds to the relevant git
 commit.  Tagging and signing should be left to dgit push.
+.TP
+\fBdgit sbuild\fR ...
+Constructs the source package, and uses sbuild to do a binary
+build, and uses mergechanges to merge the source and binary
+changes files.  Options and argumments after sbuild will be passed on
+to sbuild.  Changes files matching
+.IB package _ version _*.changes
+in the parent directory will be removed; the output is left in
+.IR package \fB_\fR version \fB_multi.changes\fR.
 .TP
 .B dgit push
 Does an `upload', pushing the current HEAD to the archive (as a source
@@ -285,13 +293,26 @@ more output (currently, up to -DD is meaningfully different).
 Specifies a git configuration option.  dgit itself is also controlled
 by git configuration options.
 .TP
-.RI \fB--dget=\fR program |\fB--dput=\fR program |\fB--debsign=\fR program
-Specifies alternative programs to use instead of dget, dput
-or debsign.
+.RI \fB--dget=\fR program |\fB--dput=\fR program |...
+Specifies alternative programs to use instead of
+.BR dget ,
+.BR dput ,
+.BR debsign ,
+.BR dpkg-buildpackage
+.BR sbuild ,
+or
+.BR mergechanges .
 .TP
-.RI \fB--dget:\fR option |\fB--dput:\fR option |\fB--debsign:\fR option
-Specifies a single additional option to pass to dget, dput or
-debsign.  Use repeatedly if multiple additional options are required.
+.RI \fB--dget:\fR option |\fB--dput:\fR option |...
+Specifies a single additional option to pass to
+.BR dget ,
+.BR dput ,
+.BR debsign ,
+.BR dpkg-buildpackage
+.BR sbuild ,
+or
+.BR mergechanges .
+Can be repeated as necessary.
 .TP
 .BI -C changesfile
 Specifies the .changes file which is to be uploaded.  By default

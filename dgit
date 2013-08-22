@@ -42,14 +42,22 @@ our (@git) = qw(git);
 our (@dget) = qw(dget);
 our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
+our (@sbuild) = qw(sbuild);
+our (@dpkgbuildpackage) = qw(dpkg-buildpackage -i\.git/ -I.git);
+our (@mergechanges) = qw(mergechanges -f);
+
+
+our %opts_opt_map = ('dget' => \@dget,
+		     'dput' => \@dput,
+		     'debsign' => \@debsign,
+                     'sbuild' => \@sbuild,
+                     'dpkg-buildpackage' => \@dpkgbuildpackage;
+                     'mergechanges' => \@mergechanges);
+
 our $keyid;
 
 our $debug = 0;
 open DEBUG, ">/dev/null" or die $!;
-
-our %opts_opt_map = ('dget' => \@dget,
-		     'dput' => \@dput,
-		     'debsign' => \@debsign);
 
 our $remotename = 'dgit';
 our $ourdscfield = 'Vcs-Dgit-Master';
@@ -62,6 +70,8 @@ sub lref () { return "refs/heads/".lbranch(); }
 sub lrref () { return "refs/remotes/$remotename/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
+
+sub dscfn () { return "${package}_${cversion}.dsc"; }
 
 our $us = 'dgit';
 
@@ -719,7 +729,7 @@ sub dopush () {
     my $clogp = parsechangelog();
     $package = getfield $clogp 'Source';
     my $cversion = getfield $clogp, 'Version';
-    my $dscfn = "${package}_${cversion}.dsc";
+    my $dscfn = dscfn();
     stat "../$dscfn" or
 	fail "looked for .dsc $dscfn, but $!;".
 	    " maybe you forgot to build";
@@ -891,13 +901,38 @@ sub cmd_build {
     $package = getfield $clogp, 'Source';
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
-	 '--git-builder=dpkg-buildpackage -i\.git/ -I.git');
+	 "--git-builder=@dpkgbuildpackage");
     unless (grep { m/^--git-debian-branch/ } @ARGV) {
 	canonicalise_suite();
 	push @cmd, "--git-debian-branch=".lbranch();
     }
     runcmd_ordryrun @cmd, @ARGV;
+    print "build successful\n";
 }
+
+sub cmd_sbuild {
+    check_not_dirty();
+    badusage "-p is not allowed with dgit sbuild" if defined $package;
+    my $clogp = parsechangelog();
+    $package = getfield $clogp, 'Source';
+    my $version = getfield $clogp, 'Version';
+    runcmd (@dpkgbuildpackage, qw(-us -uc -S));
+    chdir ".." or die $!;
+    my $sourcechanges = "${package}_${version}_source.changes";
+    my $dscfn = dscfn();
+    stat "../$dscfn" or fail "$dscfn (in parent directory): $!";
+    stat "../$sourcechanges" or fail "$sourcechanges (in parent directory): $!";
+    my $pat = "${package}_${version}_*.changes";
+    foreach my $cf (glob $pat) {
+	next if $cf eq $sourcechanges;
+	unlink $cf or fail "remove $cf: $!";
+    }
+    runcmd @sbuild, @ARGV, $sourcechanges;
+    runcmd @mergechanges, glob $pat;
+    my $multichanges = "${package}_${version}_multi.changes";
+    stat $multichanges or fail "$multichanges: $!";
+    print "build successful, results in $multichanges\n" or die $!;
+}    
 
 sub cmd_quilt_fixup {
     badusage "incorrect arguments to dgit quilt-fixup";
