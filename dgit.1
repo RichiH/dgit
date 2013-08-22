@@ -321,7 +321,8 @@ Can be repeated as necessary.
 .BI -C changesfile
 Specifies the .changes file which is to be uploaded.  By default
 dgit push looks for single .changes file in the parent directory whose
-filename suggests it is for the right package and version.
+filename suggests it is for the right package and version - or,
+if there is a _multi.changes file, dgit uses that.
 .TP
 .BI --existing-package= package
 dgit push needs to canonicalise the suite name.  But currently

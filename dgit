@@ -772,12 +772,18 @@ sub dopush () {
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     if (!$changesfile) {
-	my $pat = "${package}_c$version_*.changes";
-	my @cs = glob "../$pat";
-	fail "failed to find unique changes file".
-	    " (looked for $pat in ..); perhaps you need to use dgit -C"
-	    unless @cs==1;
-	($changesfile) = @cs;
+	my $multi = "${package}_${cversion}_multi.changes";
+	if (stat $multi) {
+	    $changesfile = $multi;
+	} else {
+	    $!==&ENOENT or die "$multi: $!";
+	    my $pat = "${package}_${cversion}_*.changes";
+	    my @cs = glob "../$pat";
+	    fail "failed to find unique changes file".
+		" (looked for $pat in ..); perhaps you need to use dgit -C"
+		unless @cs==1;
+	    ($changesfile) = @cs;
+	}
     }
     my $tag = debiantag($dversion);
     if (!check_for_git()) {
