@@ -279,6 +279,13 @@ sub parsecontrol {
     return $c;
 }
 
+sub getfield ($$) {
+    my ($dctrl,$field) = @_;
+    my $v = $dctrl->{$field};
+    return $v if defined $v;
+    fail "missing field $field in ".$v->get_option('name');
+}
+
 sub parsechangelog {
     my $c = Dpkg::Control::Hash->new();
     my $p = new IO::Handle;
@@ -392,7 +399,7 @@ sub get_archive_dsc () {
     print DEBUG Dumper($dscdata) if $debug>1;
     $dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);
     print DEBUG Dumper($dsc) if $debug>1;
-    my $fmt = $dsc->{Format};
+    my $fmt = getfield $dsc 'Format';
     fail "unsupported source format $fmt, sorry" unless $format_ok{$fmt};
 }
 
@@ -455,11 +462,13 @@ sub mktree_in_ud_from_only_subdir () {
 }
 
 sub dsc_files () {
+    my $field = $dsc->{'Checksums-Sha256'} || $dsc->{Files};
+    fail "missing both Checksums-Sha256 and Files in ".$dsc->get_option('name');
     map {
 	m/^\w+ \d+ (\S+)$/ or
 	    fail "could not parse .dsc Files/Checksums line \`$_'";
 	$1;
-    } grep m/\S/, split /\n/, ($dsc->{'Checksums-Sha256'} || $dsc->{Files});
+    } grep m/\S/, split /\n/, $field;
 }
 
 sub is_orig_file ($) {
@@ -492,32 +501,35 @@ sub generate_commit_from_dsc () {
     my ($tree,$dir) = mktree_in_ud_from_only_subdir();
     runcmd qw(sh -ec), 'dpkg-parsechangelog >../changelog.tmp';
     my $clogp = parsecontrol('../changelog.tmp',"commit's changelog");
-    my $date = cmdoutput qw(date), '+%s %z', qw(-d),$clogp->{Date};
-    my $author = $clogp->{Maintainer};
+    my $date = cmdoutput qw(date), '+%s %z', qw(-d), getfield($clogp,'Date');
+    my $author = getfield $clogp, 'Maintainer';
     $author =~ s#,.*##ms;
     my $authline = "$author $date";
     $authline =~ m/^[^<>]+ \<\S+\> \d+ [-+]\d+$/ or
 	fail "unexpected commit author line format \`$authline'".
 	    " (was generated from changelog Maintainer field)";
+    my $changes = getfield $clogp, 'Changes';
     open C, ">../commit.tmp" or die $!;
     print C <<END or die $!;
 tree $tree
 author $authline
 committer $authline
 
-$clogp->{Changes}
+$chhanges
 
 # imported from the archive
 END
     close C or die $!;
     my $outputhash = make_commit qw(../commit.tmp);
-    print "synthesised git commit from .dsc $clogp->{Version}\n";
+    my $cversion = getfield $clogp, 'Version';
+    print "synthesised git commit from .dsc $cversion\n";
     if ($upload_hash) {
 	runcmd @git, qw(reset --hard), $upload_hash;
 	runcmd qw(sh -ec), 'dpkg-parsechangelog >>../changelogold.tmp';
 	my $oldclogp = parsecontrol('../changelogold.tmp','previous changelog');
+	my $oversion = getfield $oldclogp, 'Version';
 	my $vcmp =
-	    version_compare_string($oldclogp->{Version}, $clogp->{Version});
+	    version_compare_string($oversion, $cversion);
 	if ($vcmp < 0) {
 	    # git upload/ is earlier vsn than archive, use archive
 	    open C, ">../commit2.tmp" or die $!;
@@ -528,25 +540,25 @@ parent $outputhash
 author $authline
 committer $authline
 
-Record $package ($clogp->{Version}) in archive suite $csuite
+Record $package ($cversion) in archive suite $csuite
 END
             $outputhash = make_commit qw(../commit2.tmp);
 	} elsif ($vcmp > 0) {
 	    print STDERR <<END or die $!;
-Version actually in archive:    $clogp->{Version} (older)
-Last allegedly pushed/uploaded: $oldclogp->{Version} (newer or same)
+Version actually in archive:    $cversion (older)
+Last allegedly pushed/uploaded: $oversion (newer or same)
 Perhaps the upload is stuck in incoming.  Using the version from git.
 END
             $outputhash = $upload_hash;
 	} elsif ($outputhash ne $upload_hash) {
-	    fail "version in archive ($clogp->{Version})".
+	    fail "version in archive ($cversion)".
 		" is same as version in git".
-		" to-be-uploaded (upload/) branch ($oldclogp->{Version})".
+		" to-be-uploaded (upload/) branch ($oversion)".
 		" but archive version hash no commit hash?!";
         }
     }
     chdir '../../../..' or die $!;
-    runcmd @git, qw(update-ref -m),"dgit fetch import $clogp->{Version}",
+    runcmd @git, qw(update-ref -m),"dgit fetch import $cversion",
             'DGIT_ARCHIVE', $outputhash;
     cmdoutput @git, qw(log -n2), $outputhash;
     # ... gives git a chance to complain if our commit is malformed
@@ -705,16 +717,19 @@ sub commit_quilty_patch ($) {
 sub dopush () {
     print DEBUG "actually entering push\n";
     my $clogp = parsechangelog();
-    $package = $clogp->{Source};
-    my $dscfn = "${package}_$clogp->{Version}.dsc";
+    $package = getfield $clogp 'Source';
+    my $cversion = getfield $clogp, 'Version';
+    my $dscfn = "${package}_${cversion}.dsc";
     stat "../$dscfn" or
 	fail "looked for .dsc $dscfn, but $!;".
 	    " maybe you forgot to build";
     $dsc = parsecontrol("../$dscfn","$dscfn");
-    print DEBUG "format $dsc->{Format}\n";
-    if ($dsc->{Format} eq '3.0 (quilt)') {
-	print "Format \`$dsc->{Format}', urgh\n";
-	commit_quilty_patch($dsc->{Version});
+    my $format = getfield $dsc, 'Format';
+    my $dversion = getfield $dsc, 'Version';
+    print DEBUG "format $format\n";
+    if ($format eq '3.0 (quilt)') {
+	print "Format \`$format', urgh\n";
+	commit_quilty_patch($dversion);
     }
     check_not_dirty();
     prep_ud();
@@ -748,21 +763,21 @@ sub dopush () {
 	print "[new .dsc left in $dscfn.tmp]\n";
     }
     if (!$changesfile) {
-	my $pat = "${package}_$clogp->{Version}_*.changes";
+	my $pat = "${package}_c$version_*.changes";
 	my @cs = glob "../$pat";
 	fail "failed to find unique changes file".
 	    " (looked for $pat in ..); perhaps you need to use dgit -C"
 	    unless @cs==1;
 	($changesfile) = @cs;
     }
-    my $tag = debiantag($dsc->{Version});
+    my $tag = debiantag($dversion);
     if (!check_for_git()) {
 	create_remote_git_repo();
     }
     runcmd_ordryrun @git, qw(push),access_giturl(),"HEAD:".rrref();
     if ($sign) {
 	my @tag_cmd = (@git, qw(tag -s -m),
-		       "Release $dsc->{Version} for $csuite [dgit]");
+		       "Release $dversion for $csuite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;
 	push @tag_cmd, $tag;
 	runcmd_ordryrun @tag_cmd;
@@ -775,7 +790,7 @@ sub dopush () {
     my $host = access_cfg('upload-host','RETURN-UNDEF');
     my @hostarg = defined($host) ? ($host,) : ();
     runcmd_ordryrun @dput, @hostarg, $changesfile;
-    printdone "pushed and uploaded $dsc->{Version}";
+    printdone "pushed and uploaded $dversion";
 }
 
 sub cmd_clone {
@@ -810,13 +825,13 @@ sub branchsuite () {
 sub fetchpullargs () {
     if (!defined $package) {
 	my $sourcep = parsecontrol('debian/control','debian/control');
-	$package = $sourcep->{Source};
+	$package = getfield $sourcep, 'Source';
     }
     if (@ARGV==0) {
 #	$isuite = branchsuite();  # this doesn't work because dak hates canons
 	if (!$isuite) {
 	    my $clogp = parsechangelog();
-	    $isuite = $clogp->{Distribution};
+	    $isuite = getfield $clogp, 'Distribution';
 	}
 	canonicalise_suite();
 	print "fetching from suite $csuite\n";
@@ -845,9 +860,9 @@ sub cmd_push {
     badusage "-p is not allowed with dgit push" if defined $package;
     runcmd @git, qw(diff --quiet HEAD);
     my $clogp = parsechangelog();
-    $package = $clogp->{Source};
+    $package = getfield $clogp, 'Source';
     if (@ARGV==0) {
-	$isuite = $clogp->{Distribution};
+	$isuite = getfield $clogp, 'Distribution';
 	if ($new_package) {
 	    local ($package) = $existing_package; # this is a hack
 	    canonicalise_suite();
@@ -868,8 +883,8 @@ sub cmd_build {
     # we pass further options and args to git-buildpackage
     badusage "-p is not allowed with dgit build" if defined $package;
     my $clogp = parsechangelog();
-    $isuite = $clogp->{Distribution};
-    $package = $clogp->{Source};
+    $isuite = getfield $clogp, 'Distribution';
+    $package = getfield $clogp, 'Source';
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
 	 '--git-builder=dpkg-buildpackage -i\.git/ -I.git');
@@ -883,7 +898,7 @@ sub cmd_build {
 sub cmd_quilt_fixup {
     badusage "incorrect arguments to dgit quilt-fixup";
     my $clogp = parsechangelog();
-    commit_quilty_patch($clogp->{Version});
+    commit_quilty_patch((getfield $clogp, Version));
 }
 
 sub parseopts () {
