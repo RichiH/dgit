@@ -1,4 +1,4 @@
-dgit (0.4~~iwj) experimental; urgency=low
+dgit (0.4~pre1) experimental; urgency=low
 
   * Use dgit.debian.net vhost on alioth.  Closes #720172.
   * Usage message.  Closes #720085.

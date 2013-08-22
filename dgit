@@ -707,7 +707,15 @@ sub pull () {
 }
 
 sub check_not_dirty () {
-    runcmd @git, qw(diff --quiet HEAD);
+    my @cmd = (@git, qw(diff --quiet HEAD));
+    printcmd(\*DEBUG,"+",@cmd) if $debug>0;
+    $!=0; $?=0; system @cmd;
+    return if !$! && !$?;
+    if (!$! && $?==256) {
+	fail "working tree is dirty (does not match HEAD)";
+    } else {
+	failedcmd @cmd;
+    }
 }
 
 sub commit_quilty_patch ($) {
