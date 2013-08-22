@@ -70,7 +70,11 @@ my $lbranch_re = '^refs/heads/'.$branchprefix.'/([^/.]+)$';
 sub lref () { return "refs/heads/".lbranch(); }
 sub lrref () { return "refs/remotes/$remotename/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
-sub debiantag ($) { return "debian/$_[0]"; }
+sub debiantag ($) { 
+    my ($v) = @_;
+    $v =~ y/~:/_%/;
+    return "debian/$v";
+}
 
 sub dscfn ($) { return "${package}_$_[0].dsc"; }
 
