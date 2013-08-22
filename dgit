@@ -915,8 +915,9 @@ sub cmd_push {
     if (fetch_from_archive()) {
 	is_fast_fwd(lrref(), 'HEAD') or die;
     } else {
-	fail "package appears to be new in this suite;".
-	    " if this is intentional, use --new";
+	$new_package or
+	    fail "package appears to be new in this suite;".
+	        " if this is intentional, use --new";
     }
     dopush();
 }
