@@ -649,7 +649,7 @@ sub fetch_from_archive () {
     } else {
 	$hash = generate_commit_from_dsc();
     }
-    print DEBUG "current hash $hash\n";
+    print DEBUG "current hash=$hash\n";
     if ($upload_hash) {
 	fail "not fast forward on last upload branch!".
 	    " (archive's version left in DGIT_ARCHIVE)"
