@@ -42,7 +42,7 @@ our (@git) = qw(git);
 our (@dget) = qw(dget);
 our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
-our (@sbuild) = qw(sbuild);
+our (@sbuild) = qw(sbuild -A);
 our (@dpkgbuildpackage) = qw(dpkg-buildpackage -i\.git/ -I.git);
 our (@mergechanges) = qw(mergechanges -f);
 
@@ -71,7 +71,7 @@ sub lrref () { return "refs/remotes/$remotename/$csuite"; }
 sub rrref () { return "refs/$branchprefix/$csuite"; }
 sub debiantag ($) { return "debian/$_[0]"; }
 
-sub dscfn ($) { return "${package}_${1}.dsc"; }
+sub dscfn ($) { return "${package}_$_[0].dsc"; }
 
 our $us = 'dgit';
 
@@ -276,13 +276,16 @@ sub access_giturl () {
 
 sub parsecontrolfh ($$@) {
     my ($fh, $desc, @opts) = @_;
-    my $c = Dpkg::Control::Hash->new({ 'name' => $desc, @opts });
+    my %opts = ('name' => $desc, @opts);
+    my $c = Dpkg::Control::Hash->new(%opts);
     $c->parse($fh) or die "parsing of $desc failed";
+    return $c;
 }
 
 sub parsecontrol {
     my ($file, $desc) = @_;
-    my $fh = new IO::File '<', $file or die "$file: $!";
+    my $fh = new IO::Handle;
+    open $fh, '<', $file or die "$file: $!";
     my $c = parsecontrolfh($fh,$desc);
     $fh->error and die $!;
     close $fh;
@@ -473,7 +476,9 @@ sub mktree_in_ud_from_only_subdir () {
 
 sub dsc_files () {
     my $field = $dsc->{'Checksums-Sha256'} || $dsc->{Files};
-    fail "missing both Checksums-Sha256 and Files in ".$dsc->get_option('name');
+    defined $field or
+	fail "missing both Checksums-Sha256 and Files in ".
+	$dsc->get_option('name');
     map {
 	m/^\w+ \d+ (\S+)$/ or
 	    fail "could not parse .dsc Files/Checksums line \`$_'";
@@ -632,7 +637,7 @@ sub fetch_from_archive () {
     } else {
 	die "$lrref_fn $!";
     }
-    print DEBUG "previous reference hash $upload_hash\n";
+    print DEBUG "previous reference hash=$upload_hash\n";
     my $hash;
     if (defined $dsc_hash) {
 	fail "missing git history even though dsc has hash -".
@@ -772,15 +777,16 @@ sub dopush () {
     $dsc->{$ourdscfield} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     if (!$changesfile) {
-	my $multi = "${package}_${cversion}_multi.changes";
-	if (stat $multi) {
+	my $multi = "../${package}_${cversion}_multi.changes";
+	if (stat "$multi") {
 	    $changesfile = $multi;
 	} else {
 	    $!==&ENOENT or die "$multi: $!";
 	    my $pat = "${package}_${cversion}_*.changes";
 	    my @cs = glob "../$pat";
 	    fail "failed to find unique changes file".
-		" (looked for $pat in ..); perhaps you need to use dgit -C"
+		" (looked for $pat in .., or $multi);".
+		" perhaps you need to use dgit -C"
 		unless @cs==1;
 	    ($changesfile) = @cs;
 	}
@@ -913,7 +919,7 @@ sub cmd_build {
 	push @cmd, "--git-debian-branch=".lbranch();
     }
     runcmd_ordryrun @cmd, @ARGV;
-    print "build successful\n";
+    printdone "build successful\n";
 }
 
 sub cmd_sbuild {
@@ -921,23 +927,28 @@ sub cmd_sbuild {
     badusage "-p is not allowed with dgit sbuild" if defined $package;
     my $clogp = parsechangelog();
     $package = getfield $clogp, 'Source';
+    my $isuite = getfield $clogp, 'Distribution';
     my $version = getfield $clogp, 'Version';
-    runcmd (@dpkgbuildpackage, qw(-us -uc -S));
+    runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S));
     chdir ".." or die $!;
     my $sourcechanges = "${package}_${version}_source.changes";
     my $dscfn = dscfn($version);
-    stat "../$dscfn" or fail "$dscfn (in parent directory): $!";
-    stat "../$sourcechanges" or fail "$sourcechanges (in parent directory): $!";
     my $pat = "${package}_${version}_*.changes";
-    foreach my $cf (glob $pat) {
-	next if $cf eq $sourcechanges;
-	unlink $cf or fail "remove $cf: $!";
+    if (!$dryrun) {
+	stat $dscfn or fail "$dscfn (in parent directory): $!";
+	stat $sourcechanges or fail "$sourcechanges (in parent directory): $!";
+	foreach my $cf (glob $pat) {
+	    next if $cf eq $sourcechanges;
+	    unlink $cf or fail "remove $cf: $!";
+	}
     }
-    runcmd @sbuild, @ARGV, $sourcechanges;
-    runcmd @mergechanges, glob $pat;
+    runcmd_ordryrun @sbuild, @ARGV, qw(-d), $isuite, $dscfn;
+    runcmd_ordryrun @mergechanges, glob $pat;
     my $multichanges = "${package}_${version}_multi.changes";
-    stat $multichanges or fail "$multichanges: $!";
-    print "build successful, results in $multichanges\n" or die $!;
+    if (!$dryrun) {
+	stat $multichanges or fail "$multichanges: $!";
+    }
+    printdone "build successful, results in $multichanges\n" or die $!;
 }    
 
 sub cmd_quilt_fixup {
