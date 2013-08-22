@@ -5,7 +5,7 @@ dgit \- git integration with the Debian archive
 .SH SYNOPSIS
 .B dgit
 [\fIdgit\-opts\fP] \fBclone\fP [\fIdgit\-opts\fP]
-\fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir]
+\fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir\fR]
 .br
 .B dgit
 [\fIdgit\-opts\fP] \fBfetch\fP|\fBpull\fP [\fIdgit\-opts\fP]
@@ -37,7 +37,7 @@ in git as desired; 3. run dgit build or dgit sbuild, or generate the
 source and binary packages for upload some other way; 4. do
 pre-upload tests of the proposed upload; 5. run dgit push.
 .TP
-\fBdgit clone\fR \fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir]
+\fBdgit clone\fR \fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir\fR]
 Consults the archive and dgit-repos to construct the git view of
 history for
 .I package

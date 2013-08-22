@@ -1,3 +1,9 @@
+dgit (0.7) unstable; urgency=low
+
+  * Manpage formatting fix.
+
+ --
+
 dgit (0.6) unstable; urgency=low
 
   * Allow fetching when archive has out-of-date git hash in .dsc.
