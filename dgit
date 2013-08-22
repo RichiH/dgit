@@ -211,6 +211,7 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 
 sub cfg {
     foreach my $c (@_) {
+	return undef if $c =~ /RETURN-UNDEF/;
 	my @cmd = (@git, qw(config --), $c);
 	my $v;
 	{
@@ -225,7 +226,7 @@ sub cfg {
 	my $dv = $defcfg{$c};
 	return $dv if defined $dv;
     }
-    return undef;
+    badcfg "need value for one of: @_";
 }
 
 sub access_distro () {
@@ -245,7 +246,7 @@ sub access_someuserhost ($) {
     my ($some) = @_;
     my $user = access_cfg("$some-user",'username');
     my $host = access_cfg("$some-host");
-    return defined($user) && length($user) ? "$user\@$host" : $host;
+    return length($user) ? "$user\@$host" : $host;
 }
 
 sub access_gituserhost () {
@@ -253,7 +254,7 @@ sub access_gituserhost () {
 }
 
 sub access_giturl () {
-    my $url = access_cfg('git-url');
+    my $url = access_cfg('git-url','RETURN-UNDEF');
     if (!defined $url) {
 	$url =
 	    access_cfg('git-proto').
@@ -292,8 +293,8 @@ our %rmad;
 
 sub archive_query ($) {
     my ($method) = @_;
-    my $query = access_cfg('archive-query');
-    if (!$query) {
+    my $query = access_cfg('archive-query','RETURN-UNDEF');
+    if (!defined $query) {
 	my $distro = access_distro();
 	if ($distro eq 'debian') {
 	    $query = "sshdakls:".
@@ -771,7 +772,7 @@ sub dopush () {
 	runcmd_ordryrun @debsign_cmd;
     }
     runcmd_ordryrun @git, qw(push),access_giturl(),"refs/tags/$tag";
-    my $host = access_cfg('upload-host');
+    my $host = access_cfg('upload-host','RETURN-UNDEF');
     my @hostarg = defined($host) ? ($host,) : ();
     runcmd_ordryrun @dput, @hostarg, $changesfile;
     printdone "pushed and uploaded $dsc->{Version}";
