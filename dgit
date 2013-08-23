@@ -659,11 +659,12 @@ sub fetch_from_archive () {
     if (defined $dsc_hash) {
 	fail "missing git history even though dsc has hash -".
 	    " could not find commit $dsc_hash".
-	    " (should be in ".access_giturl()."#".rref().")"
+	    " (should be in ".access_giturl()."#".rrref().")"
 	    unless $upload_hash;
 	$hash = $dsc_hash;
 	ensure_we_have_orig();
-	if (is_fast_fwd($dsc_hash,$upload_hash)) {
+	if ($dsc_hash eq $upload_hash) {
+	} elsif (is_fast_fwd($dsc_hash,$upload_hash)) {
 	    print STDERR <<END or die $!;
 
 Git commit in archive is behind the last version allegedly pushed/uploaded.
@@ -672,6 +673,9 @@ Last allegedly pushed/uploaded: $upload_hash
 $later_warning_msg
 END
 	    $hash = $upload_hash;
+	} else {
+	    fail "archive's .dsc refers to ".$dsc_hash.
+		" but this is an ancestor of ".$upload_hash;
 	}
     } else {
 	$hash = generate_commit_from_dsc();
