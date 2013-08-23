@@ -5,8 +5,10 @@ dgit (0.8) unstable; urgency=low
   * When creating repos in dgit-repos (using the ssh-cmd method),
     copy _template rather than using mkdir and git init.
     Closes: #720522.
+  * In push, do git fetch as well as archive fetch, or archive
+    fetch can fail.
 
- -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Fri, 23 Aug 2013 12:15:10 +0100
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Fri, 23 Aug 2013 12:24:09 +0100
 
 dgit (0.7) unstable; urgency=low
 

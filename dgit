@@ -938,6 +938,9 @@ sub cmd_push {
     } else {
 	badusage "incorrect arguments to dgit push";
     }
+    if (check_for_git()) {
+	git_fetch_us();
+    }
     if (fetch_from_archive()) {
 	is_fast_fwd(lrref(), 'HEAD') or die;
     } else {
