@@ -6,7 +6,7 @@ dgit (0.8) unstable; urgency=low
     copy _template rather than using mkdir and git init.
     Closes: #720522.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Fri, 23 Aug 2013 12:15:10 +0100
 
 dgit (0.7) unstable; urgency=low
 
