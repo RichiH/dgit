@@ -456,9 +456,7 @@ sub create_remote_git_repo () {
 	runcmd_ordryrun
 	    (access_cfg('ssh'),access_gituserhost(),
 	     "set -e; cd ".access_cfg('git-path').";".
-	     " mkdir -p $package.git;".
-	     " cd $package.git;".
-	     " if ! test -d objects; then git init --bare; fi");
+	     " cp -a _template $package.git");
     } else {
 	badcfg "unknown git-create \`$how'";
     }

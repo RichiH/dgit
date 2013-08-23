@@ -1,3 +1,11 @@
+dgit (0.8) unstable; urgency=low
+
+  * When creating repos in dgit-repos (using the ssh-cmd method),
+    copy _template rather than using mkdir and git init.
+    Closes: #720522.
+
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Fri, 23 Aug 2013 12:03:25 +0100
+
 dgit (0.7) unstable; urgency=low
 
   * If dak ls, or rmadison, reports multiple versions, look for them
