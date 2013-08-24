@@ -1016,6 +1016,13 @@ END
 	local $ENV{$fakeeditorenv} = cmdoutput qw(realpath --), $descfn;
 	runcmd_ordryrun @dpkgsource, qw(--commit .), $patchname;
     }
+
+    if (!open P, '>', ".pc/applied-patches") {
+	$!==&ENOENT or die $!;
+    } else {
+	close P;
+    }
+
     commit_quilty_patch();
 }
 
