@@ -757,24 +757,35 @@ sub check_not_dirty () {
     }
 }
 
-sub commit_quilty_patch ($) {
-    my ($vsn) = @_;
+sub commit_quilty_patch () {
     my $output = cmdoutput @git, qw(status --porcelain);
-    my %fixups = map {$_=>1}
-        (".pc/debian-changes-$vsn/","debian/patches/debian-changes-$vsn");
-    my @files;
+    my %adds;
+    my $bad=0;
     foreach my $l (split /\n/, $output) {
-	next unless $l =~ s/^\?\? //;
-	next unless $fixups{$l};
-	push @files, $l;
+	next unless $l =~ m/\S/;
+	if ($l =~ m{^\?\? (.pc|debian/patches)}) {
+	    $adds{$1}++;
+	} else {
+	    print STDERR "git status: $l\n";
+	    $bad++;
+	}
     }
-    print DEBUG "checking for quilty\n", Dumper(\@files);
-    if (@files == 2) {
-	my $m = "Commit Debian 3.0 (quilt) metadata";
-	print "$m\n";
-	runcmd_ordryrun @git, qw(add), @files;
-	runcmd_ordryrun @git, qw(commit -m), $m;
+    fail "unexpected output from git status (is tree clean?)" if $bad;
+    if (!%adds) {
+	print "nothing quilty to commit, ok.\n";
+	return;
     }
+    runcmd_ordryrun @git, qw(add), sort keys %adds;
+    my $m = "Commit Debian 3.0 (quilt) metadata";
+    print "$m\n";
+    runcmd_ordryrun @git, qw(commit -m), $m;
+}
+
+sub madformat ($) {
+    my ($format) = @_;
+    return 0 unless $format eq '3.0 (quilt)';
+    print "Format \`$format', urgh\n";
+    return 1;
 }
 
 sub dopush () {
@@ -794,9 +805,8 @@ sub dopush () {
 	fail "$dsc is for $dscpackage $dversion".
 	    " but debian/changelog is for $package $cversion";
     print DEBUG "format $format\n";
-    if ($format eq '3.0 (quilt)') {
-	print "Format \`$format', urgh\n";
-	commit_quilty_patch($dversion);
+    if (madformat($format)) {
+	commit_quilty_patch();
     }
     check_not_dirty();
     prep_ud();
@@ -960,6 +970,68 @@ sub cmd_push {
     dopush();
 }
 
+our $version;
+our $sourcechanges;
+our $dscfn;
+
+our $fakeeditorenv = 'DGIT_FAKE_EDITOR_QUILT';
+
+sub build_maybe_quilt_fixup () {
+    if (!open F, "debian/source/format") {
+	die $! unless $!==&ENOENT;
+	return;
+    }
+    $_ = <F>;
+    F->error and die $!;
+    chomp;
+    return unless madformat($_);
+    # sigh
+    my $headref = rev_parse('HEAD');
+    my $time = time;
+    my $patchname = "auto-$version-$headref-$time";
+    my $author = cmdoutput @git, qw(log -n1), '--pretty=format:%an <%ae>';
+    my $msg = cmdoutput @git, qw(log -n1), "--pretty=format:%s\n%b";
+    my $descfn = ".git/dgit/quilt-description.tmp";
+    open O, '>', $descfn or die "$descfn: $!";
+    $msg =~ s/\n/\n /g;
+    $msg =~ s/^\s+$/ ./mg;
+    print O <<END or die $!;
+Description: $msg
+ [generated from git commit $headref]
+Author: $author
+
+---
+
+END
+    close O or die $!;
+    {
+	local $ENV{'EDITOR'} = cmdoutput qw(realpath --), $0;
+	local $ENV{'VISUAL'} = $ENV{'EDITOR'};
+	local $ENV{$fakeeditorenv} = cmdoutput qw(realpath --), $descfn;
+	runcmd_ordryrun @dpkgsource, qw(--commit .), $patchname;
+    }
+    commit_quilty_patch();
+}
+
+sub quilt_fixup_editor () {
+    my $descfn = $ENV{$fakeeditorenv};
+    my $editing = $ARGV[$#ARGV];
+    open I1, '<', $descfn or die "$descfn: $!";
+    open I2, '<', $editing or die "$editing: $!";
+    unlink $editing or die "$editing: $!";
+    open O, '>', $editing or die "$editing: $!";
+    while (<I1>) { print O or die $!; } I1->error and die $!;
+    my $copying = 0;
+    while (<I2>) {
+	$copying ||= m/^\-\-\- /;
+	next unless $copying;
+	print O or die $!;
+    }
+    I2->error and die $!;
+    close O or die $1;
+    exit 0;
+}
+
 sub cmd_build {
     # we pass further options and args to git-buildpackage
     badusage "-p is not allowed with dgit build" if defined $package;
@@ -967,6 +1039,8 @@ sub cmd_build {
     my $clogp = parsechangelog();
     $isuite = getfield $clogp, 'Distribution';
     $package = getfield $clogp, 'Source';
+    $version = getfield $clogp, 'Version';
+    build_maybe_quilt_fixup();
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
 	 "--git-builder=@dpkgbuildpackage");
@@ -979,19 +1053,16 @@ sub cmd_build {
     printdone "build successful\n";
 }
 
-our $version;
-our $sourcechanges;
-our $dscfn;
-
 sub build_source {
-    check_not_dirty();
     badusage "-p is not allowed with this action" if defined $package;
+    check_not_dirty();
     my $clogp = parsechangelog();
     $package = getfield $clogp, 'Source';
     my $isuite = getfield $clogp, 'Distribution';
     $version = getfield $clogp, 'Version';
     $sourcechanges = "${package}_${version}_source.changes";
     $dscfn = dscfn($version);
+    build_maybe_quilt_fixup();
     if ($cleanmode eq 'dpkg-source') {
 	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S)), changesopts();
     } else {
@@ -1041,9 +1112,10 @@ sub cmd_sbuild {
 }    
 
 sub cmd_quilt_fixup {
-    badusage "incorrect arguments to dgit quilt-fixup";
+    badusage "incorrect arguments to dgit quilt-fixup" if @ARGV;
     my $clogp = parsechangelog();
-    commit_quilty_patch((getfield $clogp, 'Version'));
+    $version = getfield $clogp, 'Version';
+    build_maybe_quilt_fixup();
 }
 
 sub parseopts () {
@@ -1113,6 +1185,10 @@ sub parseopts () {
 	    }
 	}
     }
+}
+
+if ($ENV{$fakeeditorenv}) {
+    quilt_fixup_editor();
 }
 
 parseopts();
