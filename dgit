@@ -24,6 +24,7 @@ use Data::Dumper;
 use LWP::UserAgent;
 use Dpkg::Control::Hash;
 use File::Path;
+use File::Basename;
 use Dpkg::Version;
 use POSIX;
 
@@ -36,6 +37,7 @@ our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
 our $existing_package = 'dpkg';
+our $build_use_dpkgbuildpackage = 0;
 
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
@@ -45,6 +47,7 @@ our (@dput) = qw(dput);
 our (@debsign) = qw(debsign);
 our (@sbuild) = qw(sbuild -A);
 our (@dpkgbuildpackage) = qw(dpkg-buildpackage -i\.git/ -I.git);
+our (@dpkgsource) = qw(dpkg-source -i\.git/ -I.git);
 our (@mergechanges) = qw(mergechanges -f);
 
 
@@ -52,6 +55,7 @@ our %opts_opt_map = ('dget' => \@dget,
 		     'dput' => \@dput,
 		     'debsign' => \@debsign,
                      'sbuild' => \@sbuild,
+                     'dpkg-source' => \@dpkgsource,
                      'dpkg-buildpackage' => \@dpkgbuildpackage,
                      'mergechanges' => \@mergechanges);
 
@@ -975,10 +979,22 @@ sub cmd_sbuild {
     $package = getfield $clogp, 'Source';
     my $isuite = getfield $clogp, 'Distribution';
     my $version = getfield $clogp, 'Version';
-    runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S));
-    chdir ".." or die $!;
     my $sourcechanges = "${package}_${version}_source.changes";
     my $dscfn = dscfn($version);
+    if ($build_use_dpkgbuildpackage) {
+	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S));
+    } else {
+	my $pwd = cmdoutput qw(env - pwd);
+	my $leafdir = basename $pwd;
+	chdir ".." or die $!;
+	runcmd_ordryrun @dpkgsource, qw(-b --), $leafdir;
+	chdir $pwd or die $!;
+	runcmd_ordryrun qw(sh -ec),
+	    'exec >$1; shift; exec "$@"','x',
+	    $sourcechanges,
+	    qw(dpkg-genchanges -S);
+    }
+    chdir ".." or die $!;
     my $pat = "${package}_${version}_*.changes";
     if (!$dryrun) {
 	stat $dscfn or fail "$dscfn (in parent directory): $!";
