@@ -10,7 +10,7 @@ dgit (0.9) unstable; urgency=low
   * `3.0 (quilt)' fixup creates .pc/applied-patches since modern
     dpkg-source creates it even though old ones didn't always.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Sat, 24 Aug 2013 18:49:02 +0100
 
 dgit (0.8) unstable; urgency=low
 
