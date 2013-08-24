@@ -645,7 +645,7 @@ sub fetch_from_archive () {
     #  one way or another
     get_archive_dsc() or return 0;
     foreach my $field (@ourdscfield) {
-	$dsc_hash = $dsc->{$ourdscfield};
+	$dsc_hash = $dsc->{$field};
 	last if defined $dsc_hash;
     }
     if (defined $dsc_hash) {
