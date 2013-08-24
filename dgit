@@ -37,7 +37,7 @@ our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
 our $existing_package = 'dpkg';
-our $clean = 'dpkg-source';
+our $cleanmode = 'dpkg-source';
 
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
@@ -1008,7 +1008,7 @@ sub build_source {
 	chdir $pwd or die $!;
 	runcmd_ordryrun qw(sh -ec),
 	    'exec >$1; shift; exec "$@"','x',
-	    $sourcechanges,
+	    "../$sourcechanges",
 	    @dpkggenchanges, qw(-S), changesopts();
     }
 }
@@ -1101,6 +1101,12 @@ sub parseopts () {
 		    $changesfile = $1;
 		} elsif (s/^-k(.*)//s) {
 		    $keyid=$1;
+		} elsif (s/^-wn//s) {
+		    $cleanmode = 'none';
+		} elsif (s/^-wg//s) {
+		    $cleanmode = 'git';
+		} elsif (s/^-wd//s) {
+		    $cleanmode = 'dpkg-source';
 		} else {
 		    badusage "unknown short option \`$_'";
 		}
