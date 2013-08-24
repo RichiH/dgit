@@ -852,7 +852,7 @@ sub dopush () {
     my $changes = parsecontrol($changesfile,$changesfile);
     foreach my $field (qw(Source Distribution Version)) {
 	$changes->{$field} eq $clogp->{$field} or
-	    fail "changes field $field \`$changes->{$field}'"
+	    fail "changes field $field \`$changes->{$field}'".
 	        " does not match changelog \`$clogp->{$field}'";
     my $tag = debiantag($dversion);
     if (!check_for_git()) {
