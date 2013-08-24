@@ -488,7 +488,7 @@ sub mktree_in_ud_from_only_subdir () {
     $dirs[0] =~ m#^([^/]+)/\.$# or die;
     my $dir = $1;
     chdir $dir or die "$dir $!";
-    die if stat '.git';
+    fail "source package contains .git directory" if stat '.git';
     die $! unless $!==&ENOENT;
     runcmd qw(git init -q);
     rmtree('.git/objects');
