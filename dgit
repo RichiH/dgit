@@ -1064,7 +1064,7 @@ sub build_source {
     check_not_dirty();
     my $clogp = parsechangelog();
     $package = getfield $clogp, 'Source';
-    my $isuite = getfield $clogp, 'Distribution';
+    $isuite = getfield $clogp, 'Distribution';
     $version = getfield $clogp, 'Version';
     $sourcechanges = "${package}_${version}_source.changes";
     $dscfn = dscfn($version);
