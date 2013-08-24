@@ -849,6 +849,11 @@ sub dopush () {
 	    ($changesfile) = @cs;
 	}
     }
+    my $changes = parsecontrol($changesfile,$changesfile);
+    foreach my $field (qw(Source Distribution Version)) {
+	$changes->{$field} eq $clogp->{$field} or
+	    fail "changes field $field \`$changes->{$field}'"
+	        " does not match changelog \`$clogp->{$field}'";
     my $tag = debiantag($dversion);
     if (!check_for_git()) {
 	create_remote_git_repo();

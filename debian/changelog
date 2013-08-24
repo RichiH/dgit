@@ -2,6 +2,7 @@ dgit (0.9) unstable; urgency=low
 
   * New cleaning arrangements.
   * More comprehensive workaround for `3.0 (quilt)'.
+  * In push, double-check the .changes against the changelog.
 
  --
 
