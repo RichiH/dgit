@@ -591,12 +591,9 @@ Last allegedly pushed/uploaded: $oversion (newer or same)
 $later_warning_msg
 END
             $outputhash = $upload_hash;
-	} elsif ($outputhash ne $upload_hash) {
-	    fail "version in archive ($cversion)".
-		" is same as version in git".
-		" to-be-uploaded (upload/) branch ($oversion)".
-		" but archive version hash no commit hash?!";
-        }
+        } else {
+	    $outputhash = $upload_hash;
+	}
     }
     chdir '../../../..' or die $!;
     runcmd @git, qw(update-ref -m),"dgit fetch import $cversion",
