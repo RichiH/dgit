@@ -37,7 +37,7 @@ our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
 our $existing_package = 'dpkg';
-our $build_use_dpkgbuildpackage = 0;
+our $clean = 'dpkg-source';
 
 our %format_ok = map { $_=>1 } ("1.0","3.0 (native)","3.0 (quilt)");
 
@@ -48,8 +48,9 @@ our (@debsign) = qw(debsign);
 our (@sbuild) = qw(sbuild -A);
 our (@dpkgbuildpackage) = qw(dpkg-buildpackage -i\.git/ -I.git);
 our (@dpkgsource) = qw(dpkg-source -i\.git/ -I.git);
+our (@dpkggenchanges) = qw(dpkg-genchanges);
 our (@mergechanges) = qw(mergechanges -f);
-
+our (@changesopts) = ('');
 
 our %opts_opt_map = ('dget' => \@dget,
 		     'dput' => \@dput,
@@ -57,6 +58,8 @@ our %opts_opt_map = ('dget' => \@dget,
                      'sbuild' => \@sbuild,
                      'dpkg-source' => \@dpkgsource,
                      'dpkg-buildpackage' => \@dpkgbuildpackage,
+                     'dpkg-genchanges' => \@dpkggenchanges,
+                     'ch' => \@changesopts,
                      'mergechanges' => \@mergechanges);
 
 our $keyid;
@@ -81,6 +84,8 @@ sub debiantag ($) {
 }
 
 sub dscfn ($) { return "${package}_$_[0].dsc"; }
+
+sub changesopts () { return @changesopts[1..$#changesopts]; }
 
 our $us = 'dgit';
 
@@ -958,6 +963,7 @@ sub cmd_push {
 sub cmd_build {
     # we pass further options and args to git-buildpackage
     badusage "-p is not allowed with dgit build" if defined $package;
+    badusage "dgit build implies --clean=dpkg-source" if defined $package;
     my $clogp = parsechangelog();
     $isuite = getfield $clogp, 'Distribution';
     $package = getfield $clogp, 'Source';
@@ -968,22 +974,33 @@ sub cmd_build {
 	canonicalise_suite();
 	push @cmd, "--git-debian-branch=".lbranch();
     }
+    push @cmd, changesopts();
     runcmd_ordryrun @cmd, @ARGV;
     printdone "build successful\n";
 }
 
-sub cmd_sbuild {
+our $version;
+our $sourcechanges;
+our $dscfn;
+
+sub build_source {
     check_not_dirty();
-    badusage "-p is not allowed with dgit sbuild" if defined $package;
+    badusage "-p is not allowed with this action" if defined $package;
     my $clogp = parsechangelog();
     $package = getfield $clogp, 'Source';
     my $isuite = getfield $clogp, 'Distribution';
-    my $version = getfield $clogp, 'Version';
-    my $sourcechanges = "${package}_${version}_source.changes";
-    my $dscfn = dscfn($version);
-    if ($build_use_dpkgbuildpackage) {
-	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S));
+    $version = getfield $clogp, 'Version';
+    $sourcechanges = "${package}_${version}_source.changes";
+    $dscfn = dscfn($version);
+    if ($cleanmode eq 'dpkg-source') {
+	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S)), changesopts();
     } else {
+	if ($cleanmode eq 'git') {
+	    runcmd_ordryrun @git, qw(clean -xdf);
+	} elsif ($cleanmode eq 'none') {
+	} else {
+	    die "$cleanmode ?";
+	}
 	my $pwd = cmdoutput qw(env - pwd);
 	my $leafdir = basename $pwd;
 	chdir ".." or die $!;
@@ -992,8 +1009,18 @@ sub cmd_sbuild {
 	runcmd_ordryrun qw(sh -ec),
 	    'exec >$1; shift; exec "$@"','x',
 	    $sourcechanges,
-	    qw(dpkg-genchanges -S);
+	    @dpkggenchanges, qw(-S), changesopts();
     }
+}
+
+sub cmd_build_source {
+    badusage "build-source takes no additional arguments" if @ARGV;
+    build_source();
+    printdone "source built, results in $dscfn and $sourcechanges";
+}
+
+sub cmd_sbuild {
+    build_source();
     chdir ".." or die $!;
     my $pat = "${package}_${version}_*.changes";
     if (!$dryrun) {
@@ -1034,14 +1061,21 @@ sub parseopts () {
 		helponly();
 	    } elsif (m/^--new$/) {
 		$new_package=1;
-	    } elsif (m/^--(\w+)=(.*)/s && ($om = $opts_opt_map{$1})) {
+	    } elsif (m/^--(\w+)=(.*)/s &&
+		     ($om = $opts_opt_map{$1}) &&
+		     length $om->[0]) {
 		$om->[0] = $2;
-	    } elsif (m/^--(\w+):(.*)/s && ($om = $opts_opt_map{$1})) {
+	    } elsif (m/^--(\w+):(.*)/s &&
+		     ($om = $opts_opt_map{$1})) {
 		push @$om, $2;
 	    } elsif (m/^--existing-package=(.*)/s) {
 		$existing_package = $1;
 	    } elsif (m/^--distro=(.*)/s) {
 		$idistro = $1;
+	    } elsif (m/^--clean=(dpkg-source|git|none)$/s) {
+		$cleanmode = $1;
+	    } elsif (m/^--clean=(.*)$/s) {
+		badusage "unknown cleaning mode \`$1'";
 	    } else {
 		badusage "unknown long option \`$_'";
 	    }
@@ -1056,6 +1090,9 @@ sub parseopts () {
 		    $debug++;
 		} elsif (s/^-N/-/) {
 		    $new_package=1;
+		} elsif (m/^-[vm]/) {
+		    push @changesopts, $_;
+		    $_ = '';
 		} elsif (s/^-c(.*=.*)//s) {
 		    push @git, '-c', $1;
 		} elsif (s/^-d(.*)//s) {

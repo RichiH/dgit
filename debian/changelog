@@ -1,3 +1,9 @@
+dgit (0.9) unstable; urgency=low
+
+  * New cleaning arrangements (wip).
+
+ --
+
 dgit (0.8) unstable; urgency=low
 
   * Fix comparison of archive's .dsc's hash and git branch head

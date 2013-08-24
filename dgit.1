@@ -12,7 +12,7 @@ dgit \- git integration with the Debian archive
 [\fIsuite\fP]
 .br
 .B dgit
-[\fIdgit\-opts\fP] \fBbuild\fP|\fBsbuild\fP
+[\fIdgit\-opts\fP] \fBbuild\fP|\fBsbuild\fP|\fBbuild-source\fP
 [\fIbuild\-opts\fp]
 .br
 .B dgit
@@ -33,9 +33,10 @@ as
 which lives outside the Debian archive (currently, on Alioth).
 
 The usual workflow is: 1. clone or fetch; 2. make and commit changes
-in git as desired; 3. run dgit build or dgit sbuild, or generate the
-source and binary packages for upload some other way; 4. do
-pre-upload tests of the proposed upload; 5. run dgit push.
+in git as desired; 3. run dgit build, dgit sbuild or dgit
+build-source, or generate the source and binary packages for upload
+some other way; 4. do pre-upload tests of the proposed upload; 5. run
+dgit push.
 .TP
 \fBdgit clone\fR \fIpackage\fP [\fIsuite\fP] [\fB./\fP\fIdir|\fB/\fP\fIdir\fR]
 Consults the archive and dgit-repos to construct the git view of
@@ -86,7 +87,22 @@ with some suitable options.  Options and argumments after build
 will be passed on to git-buildpackage.  It is not necessary to use
 dgit build when using dgit; it is OK to use any approach which ensures
 that the generated source package corresponds to the relevant git
-commit.  Tagging and signing should be left to dgit push.
+commit.
+
+.B NB
+that this function will be changed in the future to use
+dpkg-buildpackage directly.
+
+Tagging, signing and actually uploading should be left to dgit push.
+.TP
+\fBdgit build-source\fR ...
+Builds the source package, and a changes file for a prospective
+source-only upload.  The output is left in
+.IR package \fB_\fR version \fB.dsc\fR
+and
+.IR package \fB_\fR version \fB_source.changes\fR.
+
+Tagging, signing and actually uploading should be left to dgit push.
 .TP
 \fBdgit sbuild\fR ...
 Constructs the source package, and uses sbuild to do a binary
@@ -96,6 +112,8 @@ to sbuild.  Changes files matching
 .IB package _ version _*.changes
 in the parent directory will be removed; the output is left in
 .IR package \fB_\fR version \fB_multi.changes\fR.
+
+Tagging, signing and actually uploading should be left to dgit push.
 .TP
 .B dgit push
 Does an `upload', pushing the current HEAD to the archive (as a source
@@ -288,6 +306,21 @@ Specifies that we should process source package
 rather than looking in debian/control or debian/changelog.
 Valid with dgit fetch and dgit pull, only.
 .TP
+.BR --clean=git | -wg
+The source tree should be cleaned, before building a source package
+with one of the build options, using
+.BR "git clean -xdf" .
+This will delete all files which are not tracked by git.
+.TP
+.BR --clean=none | -wn
+Do not clean the tree before building a source package.  If there are
+files which are not in git, a subsequent dgit push will fail.
+.TP
+.BR --clean=dpkg-source | -wd
+Use dpkg-buildpackage to do the build, so that the source package
+is cleaned by dpkg-source running the package's clean target.
+This is the default.  It requires the package's build dependencies.
+.TP
 .BR -N | --new
 The package may be new in this suite.  Without this, dgit will
 refuse to push.
@@ -300,26 +333,41 @@ more output (currently, up to -DD is meaningfully different).
 Specifies a git configuration option.  dgit itself is also controlled
 by git configuration options.
 .TP
+.RI \fB-v\fR version |\fB-m\fR maintaineraddress
+Passed to dpkg-genchanges (eventually).
+.TP
+.RI \fB--ch:\fR option
+Specifies a single additional option to pass, eventually, to
+dpkg-genchanges.
+.TP
 .RI \fB--dget=\fR program |\fB--dput=\fR program |...
 Specifies alternative programs to use instead of
 .BR dget ,
 .BR dput ,
 .BR debsign ,
-.BR dpkg-buildpackage
+.BR dpkg-source ,
+.BR dpkg-buildpackage ,
+.BR dpkg-genchanges ,
 .BR sbuild ,
 or
 .BR mergechanges .
+This applies only when the program is invoked directly by dgit.
 .TP
 .RI \fB--dget:\fR option |\fB--dput:\fR option |...
 Specifies a single additional option to pass to
 .BR dget ,
 .BR dput ,
 .BR debsign ,
-.BR dpkg-buildpackage
+.BR dpkg-source ,
+.BR dpkg-buildpackage ,
+.BR dpkg-genchanges ,
 .BR sbuild ,
 or
 .BR mergechanges .
 Can be repeated as necessary.
+This applies only when the program is invoked directly by dgit.
+Usually, for passing options to dpkg-genchanges, use
+.BR --ch: \fIoption\fR.
 .TP
 .BR -d "\fIdistro\fR | " --distro= \fIdistro\fR
 Specifies that the suite to be operated on is part of distro
