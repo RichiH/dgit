@@ -1017,7 +1017,7 @@ END
 	runcmd_ordryrun @dpkgsource, qw(--commit .), $patchname;
     }
 
-    if (!open P, '>', ".pc/applied-patches") {
+    if (!open P, '>>', ".pc/applied-patches") {
 	$!==&ENOENT or die $!;
     } else {
 	close P;
