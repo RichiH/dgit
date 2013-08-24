@@ -4,6 +4,7 @@ dgit (0.9) unstable; urgency=low
   * More comprehensive workaround for `3.0 (quilt)'.
   * In push, double-check the .changes against the changelog.
   * Better error when source package contains .git.  Closes: #720555.
+  * Change our .dsc field name to `Dgit'.  Relevant to #720201.
 
  --
 

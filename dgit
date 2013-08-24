@@ -68,7 +68,7 @@ our $debug = 0;
 open DEBUG, ">/dev/null" or die $!;
 
 our $remotename = 'dgit';
-our $ourdscfield = 'Vcs-Dgit-Master';
+our @ourdscfield = qw(Dgit Vcs-Dgit-Master);
 our $branchprefix = 'dgit';
 our $csuite;
 
@@ -644,7 +644,10 @@ sub fetch_from_archive () {
     # ensures that lrref() is what is actually in the archive,
     #  one way or another
     get_archive_dsc() or return 0;
-    $dsc_hash = $dsc->{$ourdscfield};
+    foreach my $field (@ourdscfield) {
+	$dsc_hash = $dsc->{$ourdscfield};
+	last if defined $dsc_hash;
+    }
     if (defined $dsc_hash) {
 	$dsc_hash =~ m/\w+/ or fail "invalid hash in .dsc \`$dsc_hash'";
 	$dsc_hash = $&;
@@ -832,7 +835,7 @@ sub dopush () {
 #    runcmd @git, qw(fetch -p ), "$alioth_git/$package.git",
 #        map { lref($_).":".rref($_) }
 #        (uploadbranch());
-    $dsc->{$ourdscfield} = rev_parse('HEAD');
+    $dsc->{$ourdscfield[0]} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     if (!$changesfile) {
 	my $multi = "../${package}_${cversion}_multi.changes";
