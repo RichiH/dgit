@@ -22,7 +22,7 @@ dgit (0.11) unstable; urgency=low
   * git-build (git-buildpackage wrapper) does not bother canonicalising
     the suite if --git-ignore-branch is used.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Sun, 25 Aug 2013 17:00:43 +0100
 
 dgit (0.10) unstable; urgency=low
 
