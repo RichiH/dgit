@@ -11,11 +11,13 @@ dgit (0.11) unstable; urgency=low
   * Use "ftp.debian.org" not "http.debian.net" as the default Debian
     archive.  (http.debian.net tends to defeat certain kinds of cacheing,
     and can also have more skew.)
+  * dgit build uses dpkg-buildpackage; there is a dgit git-build
+    for using git-buildpackage.
   * Better error message for use of UNRELEASED suite.  Closes: #720523.
   * Do not canonicalise suite more than once.  Related to: #720526.
   * Fix a badly open-coded copy of check_not_dirty.  Closes: #720524.
   * Fix some bugs in building (eg build-source would fail to do the quilt
-    fixup).
+    fixup; the --clean check in build was wrong).
 
  --
 

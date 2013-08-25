@@ -82,22 +82,20 @@ into the current branch.
 .TP
 \fBdgit build\fR ...
 Runs
-.B git-buildpackage
+.B dpkg-buildpackage
 with some suitable options.  Options and argumments after build
-will be passed on to git-buildpackage.  It is not necessary to use
+will be passed on to dpkg-buildpackage.  It is not necessary to use
 dgit build when using dgit; it is OK to use any approach which ensures
 that the generated source package corresponds to the relevant git
 commit.
-
-.B NB
-that this function will be changed in the future to use
-dpkg-buildpackage directly.
 
 Tagging, signing and actually uploading should be left to dgit push.
 .TP
 \fBdgit build-source\fR ...
 Builds the source package, and a changes file for a prospective
-source-only upload.  The output is left in
+source-only upload, using
+.BR dpkg-source .
+The output is left in
 .IR package \fB_\fR version \fB.dsc\fR
 and
 .IR package \fB_\fR version \fB_source.changes\fR.
@@ -105,13 +103,22 @@ and
 Tagging, signing and actually uploading should be left to dgit push.
 .TP
 \fBdgit sbuild\fR ...
-Constructs the source package, and uses sbuild to do a binary
-build, and uses mergechanges to merge the source and binary
-changes files.  Options and argumments after sbuild will be passed on
-to sbuild.  Changes files matching
+Constructs the source package, uses
+.B  sbuild
+to do a binary build, and uses mergechanges to merge the source and
+binary changes files.  Options and argumments after sbuild will be
+passed on to sbuild.  Changes files matching
 .IB package _ version _*.changes
 in the parent directory will be removed; the output is left in
 .IR package \fB_\fR version \fB_multi.changes\fR.
+
+Tagging, signing and actually uploading should be left to dgit push.
+.TP
+\fBdgit git-build\fR ...
+Runs
+.B git-buildpackage
+with some suitable options.  Options and argumments after git-build
+will be passed on to git-buildpackage.
 
 Tagging, signing and actually uploading should be left to dgit push.
 .TP

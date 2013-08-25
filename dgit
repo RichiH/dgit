@@ -1063,7 +1063,16 @@ sub build_prep () {
 }
 
 sub cmd_build {
-    badusage "dgit build implies --clean=dpkg-source" if defined $package;
+    badusage "dgit build implies --clean=dpkg-source"
+	if $clean ne 'dpkg-source';
+    build_prep();
+    runcmd_ordryrun @dpkgbuildpackage, qw(-us -uc), changesopts(), @ARGV;
+    printdone "build successful\n";
+}
+
+sub cmd_git_build {
+    badusage "dgit git-build implies --clean=dpkg-source"
+	if $clean ne 'dpkg-source';
     build_prep();
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
