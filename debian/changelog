@@ -14,6 +14,8 @@ dgit (0.11) unstable; urgency=low
   * Better error message for use of UNRELEASED suite.  Closes: #720523.
   * Do not canonicalise suite more than once.  Related to: #720526.
   * Fix a badly open-coded copy of check_not_dirty.  Closes: #720524.
+  * Fix some bugs in building (eg build-source would fail to do the quilt
+    fixup).
 
  --
 

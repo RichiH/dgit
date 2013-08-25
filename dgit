@@ -1052,15 +1052,19 @@ sub quilt_fixup_editor () {
     exit 0;
 }
 
-sub cmd_build {
-    # we pass further options and args to git-buildpackage
-    badusage "-p is not allowed with dgit build" if defined $package;
-    badusage "dgit build implies --clean=dpkg-source" if defined $package;
+sub build_prep () {
+    badusage "-p is not allowed when building" if defined $package;
+    check_not_dirty();
     my $clogp = parsechangelog();
     $isuite = getfield $clogp, 'Distribution';
     $package = getfield $clogp, 'Source';
     $version = getfield $clogp, 'Version';
     build_maybe_quilt_fixup();
+}
+
+sub cmd_build {
+    badusage "dgit build implies --clean=dpkg-source" if defined $package;
+    build_prep();
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
 	 "--git-builder=@dpkgbuildpackage");
@@ -1074,15 +1078,9 @@ sub cmd_build {
 }
 
 sub build_source {
-    badusage "-p is not allowed with this action" if defined $package;
-    check_not_dirty();
-    my $clogp = parsechangelog();
-    $package = getfield $clogp, 'Source';
-    $isuite = getfield $clogp, 'Distribution';
-    $version = getfield $clogp, 'Version';
+    build_prep();
     $sourcechanges = "${package}_${version}_source.changes";
     $dscfn = dscfn($version);
-    build_maybe_quilt_fixup();
     if ($cleanmode eq 'dpkg-source') {
 	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S)), changesopts();
     } else {
