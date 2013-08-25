@@ -18,6 +18,7 @@ dgit (0.11) unstable; urgency=low
   * Fix a badly open-coded copy of check_not_dirty.  Closes: #720524.
   * Fix some bugs in building (eg build-source would fail to do the quilt
     fixup; the --clean check in build was wrong).
+  * Add missing dependency on realpath.
 
  --
 
