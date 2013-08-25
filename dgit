@@ -236,7 +236,7 @@ our %defcfg = ('dgit.default.distro' => 'debian',
 	       'dgit-distro.debian.sshdakls-host' => 'coccia.debian.org',
 	       'dgit-distro.debian.sshdakls-dir' =>
 	           '/srv/ftp-master.debian.org/ftp/dists',
-	       'dgit-distro.debian.mirror' => 'http://http.debian.net/debian/');
+	       'dgit-distro.debian.mirror' => 'http://ftp.debian.org/debian/');
 
 sub cfg {
     foreach my $c (@_) {
