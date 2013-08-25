@@ -11,6 +11,8 @@ dgit (0.11) unstable; urgency=low
   * Use "ftp.debian.org" not "http.debian.net" as the default Debian
     archive.  (http.debian.net tends to defeat certain kinds of cacheing,
     and can also have more skew.)
+  * Better error message for use of UNRELEASED suite.  Closes: #720523.
+  * Do not canonicalise suite more than once.  Related to: #720526.
 
  --
 

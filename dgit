@@ -415,6 +415,8 @@ sub canonicalise_suite_madison ($$) {
 }
 
 sub canonicalise_suite () {
+    return if defined $csuite;
+    fail "cannot operate on $isuite suite" if $isuite eq 'UNRELEASED';
     $csuite = archive_query('canonicalise_suite');
     if ($isuite ne $csuite) {
 	# madison canonicalises for us
