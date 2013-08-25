@@ -1077,7 +1077,7 @@ sub cmd_git_build {
     my @cmd =
 	(qw(git-buildpackage -us -uc --git-no-sign-tags),
 	 "--git-builder=@dpkgbuildpackage");
-    unless (grep { m/^--git-debian-branch/ } @ARGV) {
+    unless (grep { m/^--git-debian-branch|^--git-ignore-branch/ } @ARGV) {
 	canonicalise_suite();
 	push @cmd, "--git-debian-branch=".lbranch();
     }

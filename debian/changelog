@@ -19,6 +19,8 @@ dgit (0.11) unstable; urgency=low
   * Fix some bugs in building (eg build-source would fail to do the quilt
     fixup; the --clean check in build was wrong).
   * Add missing dependency on realpath.
+  * git-build (git-buildpackage wrapper) does not bother canonicalising
+    the suite if --git-ignore-branch is used.
 
  --
 
