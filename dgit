@@ -763,7 +763,7 @@ sub commit_quilty_patch () {
     my $bad=0;
     foreach my $l (split /\n/, $output) {
 	next unless $l =~ m/\S/;
-	if ($l =~ m{^\?\? (.pc|debian/patches)}) {
+	if ($l =~ m{^(?:\?\?| M) (.pc|debian/patches)}) {
 	    $adds{$1}++;
 	} else {
 	    print STDERR "git status: $l\n";

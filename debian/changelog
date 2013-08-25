@@ -1,5 +1,7 @@
 dgit (0.11) unstable; urgency=low
 
+  * Fix bug which would make quilt patch fixup fail if git status
+    produced "M" lines.
   * Use "ftp.debian.org" not "http.debian.net" as the default Debian
     archive.  (http.debian.net tends to defeat certain kinds of cacheing,
     and can also have more skew.)
