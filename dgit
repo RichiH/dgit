@@ -953,7 +953,7 @@ sub cmd_pull {
 sub cmd_push {
     parseopts();
     badusage "-p is not allowed with dgit push" if defined $package;
-    runcmd @git, qw(diff --quiet HEAD);
+    check_not_dirty();
     my $clogp = parsechangelog();
     $package = getfield $clogp, 'Source';
     if (@ARGV==0) {
