@@ -992,18 +992,23 @@ sub build_maybe_quilt_fixup () {
     chomp;
     return unless madformat($_);
     # sigh
+    my $clogp = parsechangelog();
+    my $version = getfield $clogp, 'Version';
+    my $author = getfield $clogp, 'Maintainer';
     my $headref = rev_parse('HEAD');
     my $time = time;
+    my $ncommits = 3;
     my $patchname = "auto-$version-$headref-$time";
-    my $author = cmdoutput @git, qw(log -n1), '--pretty=format:%an <%ae>';
-    my $msg = cmdoutput @git, qw(log -n1), "--pretty=format:%s\n%b";
+    my $msg = cmdoutput @git, qw(log), "-n$ncommits";
     my $descfn = ".git/dgit/quilt-description.tmp";
     open O, '>', $descfn or die "$descfn: $!";
     $msg =~ s/\n/\n /g;
     $msg =~ s/^\s+$/ ./mg;
     print O <<END or die $!;
-Description: $msg
- [generated from git commit $headref]
+Description: Automatically generated patch ($clogp->{Version})
+ Last (up to) $ncommits git changes, FYI:
+ .
+ $msg
 Author: $author
 
 ---
