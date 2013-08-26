@@ -2,6 +2,7 @@ dgit (0.12) unstable; urgency=low
 
   * Cope with packages with epoch.  Closes: #720897.
   * Add Closes line for #720595 to changelog entry for 0.11.
+  * Improve error message for non-fast-forward push.  Closes: #720896.
 
  --
 

@@ -984,7 +984,10 @@ sub cmd_push {
 	git_fetch_us();
     }
     if (fetch_from_archive()) {
-	is_fast_fwd(lrref(), 'HEAD') or die;
+	is_fast_fwd(lrref(), 'HEAD') or
+	    fail "dgit push: HEAD is not a descendant".
+	        " of the archive's version.\n".
+		"$us: To overwrite it, use git-merge -s ours ".lrref().".";
     } else {
 	$new_package or
 	    fail "package appears to be new in this suite;".
