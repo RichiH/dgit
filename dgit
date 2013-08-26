@@ -37,6 +37,7 @@ our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
 our $ignoredirty = 0;
+our $noquilt = 0;
 our $existing_package = 'dpkg';
 our $cleanmode = 'dpkg-source';
 
@@ -804,6 +805,10 @@ sub madformat ($) {
     my ($format) = @_;
     return 0 unless $format eq '3.0 (quilt)';
     print "Format \`$format', urgh\n";
+    if ($noquilt) {
+	print "Not doing any fixup of \`$format' due to --no-quilt-fixup";
+	return 0;
+    }
     return 1;
 }
 
@@ -1197,6 +1202,8 @@ sub parseopts () {
 		badusage "unknown cleaning mode \`$1'";
 	    } elsif (m/^--ignore-dirty$/s) {
 		$ignoredirty = 1;
+	    } elsif (m/^--no-quilt-fixup$/s) {
+		$noquilt = 1;
 	    } else {
 		badusage "unknown long option \`$_'";
 	    }

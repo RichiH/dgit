@@ -352,6 +352,11 @@ This option may not work properly on `3.0 (quilt)' packages, as in
 that case dgit needs to use and perhaps commit parts of your working
 tree.
 .TP
+.BR --no-quilt-fixup
+Do not fix up source format `3.0 (quilt)' metadata.  If you use this
+option and the package did in fact need fixing up, dgit push will
+fail.
+.TP
 .BI -D
 Prints debugging information to stderr.  Repeating the option produces
 more output (currently, up to -DD is meaningfully different).
