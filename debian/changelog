@@ -1,6 +1,7 @@
 dgit (0.12) unstable; urgency=low
 
   * Cope with packages with epoch.  Closes: #720897.
+  * Add Closes line for #720595 to changelog entry for 0.11.
 
  --
 
@@ -18,7 +19,7 @@ dgit (0.11) unstable; urgency=low
     archive.  (http.debian.net tends to defeat certain kinds of cacheing,
     and can also have more skew.)
   * dgit build uses dpkg-buildpackage; there is a dgit git-build
-    for using git-buildpackage.
+    for using git-buildpackage.  Closes: #720595.
   * Better error message for use of UNRELEASED suite.  Closes: #720523.
   * Do not canonicalise suite more than once.  Related to: #720526.
   * Fix a badly open-coded copy of check_not_dirty.  Closes: #720524.
