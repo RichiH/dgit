@@ -83,7 +83,16 @@ sub debiantag ($) {
     return "debian/$v";
 }
 
-sub dscfn ($) { return "${package}_$_[0].dsc"; }
+sub stripepoch ($) {
+    my ($vsn) = @_;
+    $vsn =~ s/^\d+\://;
+    return $vsn;
+}
+
+sub dscfn ($) {
+    my ($vsn) = @_;
+    return "${package}_".(stripepoch $vsn).".dsc";
+}
 
 sub changesopts () { return @changesopts[1..$#changesopts]; }
 
@@ -399,7 +408,7 @@ sub madison_parse ($) {
 	}
 	$5 eq 'source' or die "$rmad ?";
 	my $prefix = substr($package, 0, $package =~ m/^l/ ? 4 : 1);
-	my $subpath = "/pool/$component/$prefix/$package/${package}_$vsn.dsc";
+	my $subpath = "/pool/$component/$prefix/$package/".dscfn($vsn);
 	push @out, [$vsn,$subpath,$newsuite];
     }
     return sort { -version_compare_string($a->[0],$b->[0]); } @out;
@@ -837,12 +846,12 @@ sub dopush () {
     $dsc->{$ourdscfield[0]} = rev_parse('HEAD');
     $dsc->save("../$dscfn.tmp") or die $!;
     if (!$changesfile) {
-	my $multi = "../${package}_${cversion}_multi.changes";
+	my $multi = "../${package}_".(stripepoch $cversion)."_multi.changes";
 	if (stat "$multi") {
 	    $changesfile = $multi;
 	} else {
 	    $!==&ENOENT or die "$multi: $!";
-	    my $pat = "${package}_${cversion}_*.changes";
+	    my $pat = "${package}_".(stripepoch $cversion)."_*.changes";
 	    my @cs = glob "../$pat";
 	    fail "failed to find unique changes file".
 		" (looked for $pat in .., or $multi);".
@@ -1088,7 +1097,7 @@ sub cmd_git_build {
 
 sub build_source {
     build_prep();
-    $sourcechanges = "${package}_${version}_source.changes";
+    $sourcechanges = "${package}_".(stripepoch $version)."_source.changes";
     $dscfn = dscfn($version);
     if ($cleanmode eq 'dpkg-source') {
 	runcmd_ordryrun (@dpkgbuildpackage, qw(-us -uc -S)), changesopts();
@@ -1120,7 +1129,7 @@ sub cmd_build_source {
 sub cmd_sbuild {
     build_source();
     chdir ".." or die $!;
-    my $pat = "${package}_${version}_*.changes";
+    my $pat = "${package}_".(stripepoch $version)."_*.changes";
     if (!$dryrun) {
 	stat $dscfn or fail "$dscfn (in parent directory): $!";
 	stat $sourcechanges or fail "$sourcechanges (in parent directory): $!";
@@ -1131,7 +1140,7 @@ sub cmd_sbuild {
     }
     runcmd_ordryrun @sbuild, @ARGV, qw(-d), $isuite, $dscfn;
     runcmd_ordryrun @mergechanges, glob $pat;
-    my $multichanges = "${package}_${version}_multi.changes";
+    my $multichanges = "${package}_".(stripepoch $version)."_multi.changes";
     if (!$dryrun) {
 	stat $multichanges or fail "$multichanges: $!";
     }
