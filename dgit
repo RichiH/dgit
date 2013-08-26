@@ -36,6 +36,7 @@ our $sign = 1;
 our $dryrun = 0;
 our $changesfile;
 our $new_package = 0;
+our $ignoredirty = 0;
 our $existing_package = 'dpkg';
 our $cleanmode = 'dpkg-source';
 
@@ -763,6 +764,7 @@ sub pull () {
 }
 
 sub check_not_dirty () {
+    return if $ignoredirty;
     my @cmd = (@git, qw(diff --quiet HEAD));
     printcmd(\*DEBUG,"+",@cmd) if $debug>0;
     $!=0; $?=0; system @cmd;
@@ -1193,6 +1195,8 @@ sub parseopts () {
 		$cleanmode = $1;
 	    } elsif (m/^--clean=(.*)$/s) {
 		badusage "unknown cleaning mode \`$1'";
+	    } elsif (m/^--ignore-dirty$/s) {
+		$ignoredirty = 1;
 	    } else {
 		badusage "unknown long option \`$_'";
 	    }

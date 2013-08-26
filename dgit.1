@@ -342,6 +342,16 @@ This is the default.  It requires the package's build dependencies.
 The package may be new in this suite.  Without this, dgit will
 refuse to push.
 .TP
+.BR --ignore-dirty
+Do not complain if the working tree does not match your git HEAD.
+This can be useful with build, if you plan to commit later.  (dgit
+push will still ensure that the .dsc you upload and the git tree
+you push are identical, so this option won't make broken pushes.)
+
+This option may not work properly on `3.0 (quilt)' packages, as in
+that case dgit needs to use and perhaps commit parts of your working
+tree.
+.TP
 .BI -D
 Prints debugging information to stderr.  Repeating the option produces
 more output (currently, up to -DD is meaningfully different).
