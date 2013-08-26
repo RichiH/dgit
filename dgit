@@ -639,8 +639,14 @@ sub rev_parse ($) {
 
 sub is_fast_fwd ($$) {
     my ($ancestor,$child) = @_;
-    my $mb = cmdoutput @git, qw(merge-base), $ancestor, $child;
-    return rev_parse($mb) eq rev_parse($ancestor);
+    my @cmd = (@git, qw(merge-base), $ancestor, $child);
+    my $mb = cmdoutput_errok @cmd;
+    if (defined $mb) {
+	return rev_parse($mb) eq rev_parse($ancestor);
+    } else {
+	$?==256 or failedcmd @cmd;
+	return 0;
+    }
 }
 
 sub git_fetch_us () {
