@@ -6,6 +6,9 @@ dgit (0.13) unstable; urgency=low
     erroneously duplicated during editing, apparently.)
   * Remove DGET_UNPACK from the environment in case the user has set it.
   * Remove scary warning from Description.
+  * When uploading to Debian, tell dput to upload to "ftp-master".  This
+    avoids problems with derivatives whose dput has a different default.
+    Closes: #720958.
 
  --
 
