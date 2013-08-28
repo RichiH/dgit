@@ -512,16 +512,37 @@ sub mktree_in_ud_from_only_subdir () {
     return ($tree,$dir);
 }
 
-sub dsc_files () {
-    my $field = $dsc->{'Checksums-Sha256'} || $dsc->{Files};
-    defined $field or
-	fail "missing both Checksums-Sha256 and Files in ".
+sub dsc_files_info () {
+    foreach my $csum (qw(Sha256 Sha1 MD5)) {
+	my $fname = $csum eq 'MD5' ? 'Files' : "Checksums-$csum";
+	my $field = $dsc->{$fname};
+	next unless defined $field;
+	my $digest = uc $csum;
+	if (!eval "use Digest::$digest; 1;") {
+	    print DEBUG "ignoring $fname because $@\n";
+	    next;
+	}
+	my @out;
+	foreach (split /\n/, $field) {
+	    next unless m/\S/;
+	    m/^(\w+) (\d+) (\S+)$/ or
+		fail "could not parse .dsc $fname line \`$_'";
+	    my $digester = eval "Digest::$digest->new;" or die $@;
+	    push @out, {
+		Hash => $1,
+		Bytes => $2,
+		Filename => $3,
+		Digester => $digester,
+	    };
+	}
+	return @out;
+    }
+    fail "missing any supported Checksums-* or Files field in ".
 	$dsc->get_option('name');
-    map {
-	m/^\w+ \d+ (\S+)$/ or
-	    fail "could not parse .dsc Files/Checksums line \`$_'";
-	$1;
-    } grep m/\S/, split /\n/, $field;
+}
+
+sub dsc_files () {
+    map { $_->{Filename} } dsc_files_info();
 }
 
 sub is_orig_file ($) {
