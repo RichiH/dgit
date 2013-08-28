@@ -18,6 +18,3 @@ Description: git interoperability with the Debian archive
  dgit push constructs uploads from git commits
  .
  dgit clone and dgit fetch construct git commits from uploads.
- .
- WARNING: This program is INCOMPLETE and WRONG and should not yet
- be used.  It is being uploaded to facilitate development.

@@ -1,6 +1,7 @@
 dgit (0.13) unstable; urgency=low
 
   * Remove DGET_UNPACK from the environment in case the user has set it.
+  * Remove scary warning from Description.
 
  --
 
