@@ -1247,6 +1247,8 @@ if ($ENV{$fakeeditorenv}) {
     quilt_fixup_editor();
 }
 
+delete $ENV{'DGET_UNPACK'};
+
 parseopts();
 print STDERR "DRY RUN ONLY\n" if $dryrun;
 if (!@ARGV) {
