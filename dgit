@@ -443,8 +443,6 @@ sub get_archive_dsc () {
 	$dscurl = access_cfg('mirror').$subpath;
 	$dscdata = url_get($dscurl);
 	next unless defined $dscdata;
-	$dscurl = access_cfg('mirror').$subpath;
-	$dscdata = url_get($dscurl);
 	my $dscfh = new IO::File \$dscdata, '<' or die $!;
 	print DEBUG Dumper($dscdata) if $debug>1;
 	$dsc = parsecontrolfh($dscfh,$dscurl, allow_pgp=>1);

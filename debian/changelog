@@ -2,6 +2,8 @@ dgit (0.13) unstable; urgency=low
 
   * Reuse already-downloaded .orig files after checking their hashes.
     Closes: #720526.  (This introduces a dependency on the Digest::SHA.)
+  * Do not always pointlessly fetch the .dsc twice.  (That code was
+    erroneously duplicated during editing, apparently.)
   * Remove DGET_UNPACK from the environment in case the user has set it.
   * Remove scary warning from Description.
 
