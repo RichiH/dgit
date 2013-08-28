@@ -232,7 +232,7 @@ dgit push can operate on any commit which is a descendant of the
 current dgit/suite tip in dgit-repos.
 
 Uploads made by dgit contain an additional field
-.B Vcs-Dgit-Master
+.B Dgit
 in the source package .dsc.  (This is added by dgit push.)
 This specifies a commit (an ancestor of the dgit/suite
 branch) whose tree is identical to the unpacked source upload.
@@ -501,7 +501,7 @@ We should be using some kind of vhost/vpath setup for the git repos on
 alioth, so that they can be moved later if and when this turns out to
 be a good idea.
 
-Debian Policy needs to be updated to describe the new Vcs-Dgit-Master
+Debian Policy needs to be updated to describe the new Dgit .dsc
 field (and to specify that it is an RC bug for that field to refer
 to an unavailable commit).
 
