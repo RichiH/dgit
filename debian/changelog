@@ -11,6 +11,8 @@ dgit (0.13) unstable; urgency=low
     Closes: #720958.
   * Fix some bugs in dgit fetch --dry-run which made dgit push
     --dry-run often not work at all.
+  * Update the local tracking branch for the dgit remote, when pushing.
+    Closes: #720956.
 
  --
 

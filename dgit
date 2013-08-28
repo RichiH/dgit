@@ -911,6 +911,7 @@ sub dopush () {
 	create_remote_git_repo();
     }
     runcmd_ordryrun @git, qw(push),access_giturl(),"HEAD:".rrref();
+    runcmd_ordryrun @git, qw(update-ref -m), 'dgit push', lrref(), 'HEAD';
     if (!$dryrun) {
 	rename "../$dscfn.tmp","../$dscfn" or die "$dscfn $!";
     } else {
