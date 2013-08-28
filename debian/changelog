@@ -14,6 +14,7 @@ dgit (0.13) unstable; urgency=low
   * Update the local tracking branch for the dgit remote, when pushing.
     Closes: #720956.
   * Fix references in manpage to old Vcs-Dgit-Master field name.
+  * Reorganise manpage sections to be in a more conventional order.
 
  --
 

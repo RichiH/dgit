@@ -148,6 +148,145 @@ by making a new debian/ patch containing your unquilty changes) and
 make a commit of the changes it has made.
 
 This is normally done automatically by dgit build and dgit push.
+.SH OPTIONS
+.TP
+.BR --dry-run | -n
+Go through the motions, fetching all information needed, but do not
+actually update the output(s).  For push, dgit does
+the required checks and leaves the new .dsc in a temporary file,
+but does not sign, tag, push or upload.
+.TP
+.BI -k keyid
+Use
+.I keyid
+for signing the tag and the upload.
+.TP
+.BR --no-sign
+does not sign tags or uploads (meaningful only with push).
+.TP
+.TP
+.BI -p package
+Specifies that we should process source package
+.I package
+rather than looking in debian/control or debian/changelog.
+Valid with dgit fetch and dgit pull, only.
+.TP
+.BR --clean=git | -wg
+The source tree should be cleaned, before building a source package
+with one of the build options, using
+.BR "git clean -xdf" .
+This will delete all files which are not tracked by git.
+.TP
+.BR --clean=none | -wn
+Do not clean the tree before building a source package.  If there are
+files which are not in git, a subsequent dgit push will fail.
+.TP
+.BR --clean=dpkg-source | -wd
+Use dpkg-buildpackage to do the build, so that the source package
+is cleaned by dpkg-source running the package's clean target.
+This is the default.  It requires the package's build dependencies.
+.TP
+.BR -N | --new
+The package may be new in this suite.  Without this, dgit will
+refuse to push.
+.TP
+.BR --ignore-dirty
+Do not complain if the working tree does not match your git HEAD.
+This can be useful with build, if you plan to commit later.  (dgit
+push will still ensure that the .dsc you upload and the git tree
+you push are identical, so this option won't make broken pushes.)
+
+This option may not work properly on `3.0 (quilt)' packages, as in
+that case dgit needs to use and perhaps commit parts of your working
+tree.
+.TP
+.BR --no-quilt-fixup
+Do not fix up source format `3.0 (quilt)' metadata.  If you use this
+option and the package did in fact need fixing up, dgit push will
+fail.
+.TP
+.BI -D
+Prints debugging information to stderr.  Repeating the option produces
+more output (currently, up to -DD is meaningfully different).
+.TP
+.BI -c name = value
+Specifies a git configuration option.  dgit itself is also controlled
+by git configuration options.
+.TP
+.RI \fB-v\fR version |\fB-m\fR maintaineraddress
+Passed to dpkg-genchanges (eventually).
+.TP
+.RI \fB--ch:\fR option
+Specifies a single additional option to pass, eventually, to
+dpkg-genchanges.
+.TP
+.RI \fB--dget=\fR program |\fB--dput=\fR program |...
+Specifies alternative programs to use instead of
+.BR dget ,
+.BR dput ,
+.BR debsign ,
+.BR dpkg-source ,
+.BR dpkg-buildpackage ,
+.BR dpkg-genchanges ,
+.BR sbuild ,
+or
+.BR mergechanges .
+This applies only when the program is invoked directly by dgit.
+.TP
+.RI \fB--dget:\fR option |\fB--dput:\fR option |...
+Specifies a single additional option to pass to
+.BR dget ,
+.BR dput ,
+.BR debsign ,
+.BR dpkg-source ,
+.BR dpkg-buildpackage ,
+.BR dpkg-genchanges ,
+.BR sbuild ,
+or
+.BR mergechanges .
+Can be repeated as necessary.
+This applies only when the program is invoked directly by dgit.
+Usually, for passing options to dpkg-genchanges, use
+.BR --ch: \fIoption\fR.
+.TP
+.BR -d "\fIdistro\fR | " --distro= \fIdistro\fR
+Specifies that the suite to be operated on is part of distro
+.IR distro .
+This overrides the default value found from the git config option
+.BR dgit-suite. \fIsuite\fR .distro .
+The only effect is that other configuration variables (used
+for accessing the archive and dgit-repos) used are
+.BR dgit-distro. \fIdistro\fR .* .
+
+If your suite is part of a distro that dgit already knows about, you
+can use this option to make dgit work even if your dgit doesn't know
+about the suite.  For example, specifying
+.B -ddebian
+will work when the suite is an unknown suite in the Debian archive.
+
+To define a new distro it is necessary to define methods and URLs
+for fetching (and, for dgit push, altering) a variety of information both
+in the archive and in dgit-repos.  How to do this is not yet
+documented, and currently the arrangements are unpleasant.  See
+BUGS.
+.TP
+.BI -C changesfile
+Specifies the .changes file which is to be uploaded.  By default
+dgit push looks for single .changes file in the parent directory whose
+filename suggests it is for the right package and version - or,
+if there is a _multi.changes file, dgit uses that.
+.TP
+.BI --existing-package= package
+dgit push needs to canonicalise the suite name.  But currently
+there is no way to ask the archive to do this without knowing the
+name of an existing package.  Without --new we can just use the
+package we are trying to push.  But with --new that will not work, so
+we guess
+.B dpkg
+or use the value of this option.
+.TP
+.BR -h | --help
+Print a usage summary.
 .SH WORKFLOW - SIMPLE
 It is always possible with dgit to clone or fetch a package, make
 changes in git (using git-commit) on the suite branch
@@ -300,154 +439,6 @@ You can explicitly request that dgit do just this fixup, by running
 dgit quilt-fixup.
 
 We recommend against the use of `3.0 (quilt)'.
-.SH OPTIONS
-.TP
-.BR --dry-run | -n
-Go through the motions, fetching all information needed, but do not
-actually update the output(s).  For push, dgit does
-the required checks and leaves the new .dsc in a temporary file,
-but does not sign, tag, push or upload.
-.TP
-.BI -k keyid
-Use
-.I keyid
-for signing the tag and the upload.
-.TP
-.BR --no-sign
-does not sign tags or uploads (meaningful only with push).
-.TP
-.TP
-.BI -p package
-Specifies that we should process source package
-.I package
-rather than looking in debian/control or debian/changelog.
-Valid with dgit fetch and dgit pull, only.
-.TP
-.BR --clean=git | -wg
-The source tree should be cleaned, before building a source package
-with one of the build options, using
-.BR "git clean -xdf" .
-This will delete all files which are not tracked by git.
-.TP
-.BR --clean=none | -wn
-Do not clean the tree before building a source package.  If there are
-files which are not in git, a subsequent dgit push will fail.
-.TP
-.BR --clean=dpkg-source | -wd
-Use dpkg-buildpackage to do the build, so that the source package
-is cleaned by dpkg-source running the package's clean target.
-This is the default.  It requires the package's build dependencies.
-.TP
-.BR -N | --new
-The package may be new in this suite.  Without this, dgit will
-refuse to push.
-.TP
-.BR --ignore-dirty
-Do not complain if the working tree does not match your git HEAD.
-This can be useful with build, if you plan to commit later.  (dgit
-push will still ensure that the .dsc you upload and the git tree
-you push are identical, so this option won't make broken pushes.)
-
-This option may not work properly on `3.0 (quilt)' packages, as in
-that case dgit needs to use and perhaps commit parts of your working
-tree.
-.TP
-.BR --no-quilt-fixup
-Do not fix up source format `3.0 (quilt)' metadata.  If you use this
-option and the package did in fact need fixing up, dgit push will
-fail.
-.TP
-.BI -D
-Prints debugging information to stderr.  Repeating the option produces
-more output (currently, up to -DD is meaningfully different).
-.TP
-.BI -c name = value
-Specifies a git configuration option.  dgit itself is also controlled
-by git configuration options.
-.TP
-.RI \fB-v\fR version |\fB-m\fR maintaineraddress
-Passed to dpkg-genchanges (eventually).
-.TP
-.RI \fB--ch:\fR option
-Specifies a single additional option to pass, eventually, to
-dpkg-genchanges.
-.TP
-.RI \fB--dget=\fR program |\fB--dput=\fR program |...
-Specifies alternative programs to use instead of
-.BR dget ,
-.BR dput ,
-.BR debsign ,
-.BR dpkg-source ,
-.BR dpkg-buildpackage ,
-.BR dpkg-genchanges ,
-.BR sbuild ,
-or
-.BR mergechanges .
-This applies only when the program is invoked directly by dgit.
-.TP
-.RI \fB--dget:\fR option |\fB--dput:\fR option |...
-Specifies a single additional option to pass to
-.BR dget ,
-.BR dput ,
-.BR debsign ,
-.BR dpkg-source ,
-.BR dpkg-buildpackage ,
-.BR dpkg-genchanges ,
-.BR sbuild ,
-or
-.BR mergechanges .
-Can be repeated as necessary.
-This applies only when the program is invoked directly by dgit.
-Usually, for passing options to dpkg-genchanges, use
-.BR --ch: \fIoption\fR.
-.TP
-.BR -d "\fIdistro\fR | " --distro= \fIdistro\fR
-Specifies that the suite to be operated on is part of distro
-.IR distro .
-This overrides the default value found from the git config option
-.BR dgit-suite. \fIsuite\fR .distro .
-The only effect is that other configuration variables (used
-for accessing the archive and dgit-repos) used are
-.BR dgit-distro. \fIdistro\fR .* .
-
-If your suite is part of a distro that dgit already knows about, you
-can use this option to make dgit work even if your dgit doesn't know
-about the suite.  For example, specifying
-.B -ddebian
-will work when the suite is an unknown suite in the Debian archive.
-
-To define a new distro it is necessary to define methods and URLs
-for fetching (and, for dgit push, altering) a variety of information both
-in the archive and in dgit-repos.  How to do this is not yet
-documented, and currently the arrangements are unpleasant.  See
-BUGS.
-.TP
-.BI -C changesfile
-Specifies the .changes file which is to be uploaded.  By default
-dgit push looks for single .changes file in the parent directory whose
-filename suggests it is for the right package and version - or,
-if there is a _multi.changes file, dgit uses that.
-.TP
-.BI --existing-package= package
-dgit push needs to canonicalise the suite name.  But currently
-there is no way to ask the archive to do this without knowing the
-name of an existing package.  Without --new we can just use the
-package we are trying to push.  But with --new that will not work, so
-we guess
-.B dpkg
-or use the value of this option.
-.TP
-.BR -h | --help
-Print a usage summary.
-.SH SEE ALSO
-\fBdget\fP(1),
-\fBdput\fP(1),
-\fBdebsign\fP(1),
-\fBgit-config\fP(1),
-\fBgit-buildpackage\fP(1),
-\fBdpkg-buildpackage\fP(1),
-.br
-https://wiki.debian.org/Alioth
 .SH CONFIGURATION
 dgit looks at the following git config keys to control its behaviour.
 You may set them with git-config (either in system-global or per-tree
@@ -568,3 +559,12 @@ particular suite.  I'm assured that the archive layout is a
 --dry-run does not always work properly, as not doing some of the git
 fetches may result in subsequent actions being different.  Doing a
 non-dry-run dgit fetch first will help.
+.SH SEE ALSO
+\fBdget\fP(1),
+\fBdput\fP(1),
+\fBdebsign\fP(1),
+\fBgit-config\fP(1),
+\fBgit-buildpackage\fP(1),
+\fBdpkg-buildpackage\fP(1),
+.br
+https://wiki.debian.org/Alioth
