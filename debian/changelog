@@ -18,7 +18,7 @@ dgit (0.13) unstable; urgency=low
   * New manpage section on FILES IN THE SOURCE PACKAGE BUT NOT IN GIT.
     Closes: #721186.
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Thu, 29 Aug 2013 00:27:23 +0100
 
 dgit (0.12) unstable; urgency=low
 
