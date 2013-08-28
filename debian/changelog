@@ -15,6 +15,8 @@ dgit (0.13) unstable; urgency=low
     Closes: #720956.
   * Fix references in manpage to old Vcs-Dgit-Master field name.
   * Reorganise manpage sections to be in a more conventional order.
+  * New manpage section on FILES IN THE SOURCE PACKAGE BUT NOT IN GIT.
+    Closes: #721186.
 
  --
 
