@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9)
 
 Package: dgit
 Depends: perl, libwww-perl, libdpkg-perl, git-core, devscripts, dpkg-dev,
-         ${misc:Depends}, realpath
+         ${misc:Depends}, realpath, libdigest-sha-perl
 Recommends: ssh-client
 Suggests: sbuild
 Architecture: all

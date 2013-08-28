@@ -513,21 +513,19 @@ sub mktree_in_ud_from_only_subdir () {
 }
 
 sub dsc_files_info () {
-    foreach my $csum (qw(Sha256 Sha1 MD5)) {
-	my $fname = $csum eq 'MD5' ? 'Files' : "Checksums-$csum";
+    foreach my $csumi (['Checksums-Sha256','Digest::SHA', 'new(256)'],
+		       ['Checksums-Sha1',  'Digest::SHA', 'new(1)'],
+		       ['Files',           'Digest::MD5', 'new()']) {
+	my ($fname, $module, $method) = @$csumi;
 	my $field = $dsc->{$fname};
 	next unless defined $field;
-	my $digest = uc $csum;
-	if (!eval "use Digest::$digest; 1;") {
-	    print DEBUG "ignoring $fname because $@\n";
-	    next;
-	}
+	eval "use $module; 1;" or die $@;
 	my @out;
 	foreach (split /\n/, $field) {
 	    next unless m/\S/;
 	    m/^(\w+) (\d+) (\S+)$/ or
 		fail "could not parse .dsc $fname line \`$_'";
-	    my $digester = eval "Digest::$digest->new;" or die $@;
+	    my $digester = eval "$module"."->$method;" or die $@;
 	    push @out, {
 		Hash => $1,
 		Bytes => $2,
@@ -639,10 +637,20 @@ END
 }
 
 sub ensure_we_have_orig () {
-    foreach my $f (dsc_files()) {
+    foreach my $fi (dsc_files_info()) {
+	my $f = $fi->{Filename};
 	next unless is_orig_file($f);
-	if (stat "../$f") {
-	    die "$f ?" unless -f _;
+	if (open F, "<", "../$f") {
+	    $fi->{Digester}->reset();
+	    $fi->{Digester}->addfile(*F);
+	    F->error and die $!;
+	    my $got = $fi->{Digester}->hexdigest();
+	    $got eq $fi->{Hash} or
+		fail "existing file $f has hash $got but .dsc".
+		    " demands hash $fi->{Hash}".
+		    " (perhaps you should delete this file?)";
+	    print "using existing $f\n";
+	    next;
 	} else {
 	    die "$f $!" unless $!==&ENOENT;
 	}
