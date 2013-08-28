@@ -565,5 +565,6 @@ sane way to find the path in the archive pool of the .dsc for a
 particular suite.  I'm assured that the archive layout is a
 `well known algorithm' by now.
 
---dry-run often does not work with fetch, even though this is a
-logically plausible request.  (It fails, instead.)
+--dry-run does not always work properly, as not doing some of the git
+fetches may result in subsequent actions being different.  Doing a
+non-dry-run dgit fetch first will help.

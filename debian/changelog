@@ -9,6 +9,8 @@ dgit (0.13) unstable; urgency=low
   * When uploading to Debian, tell dput to upload to "ftp-master".  This
     avoids problems with derivatives whose dput has a different default.
     Closes: #720958.
+  * Fix some bugs in dgit fetch --dry-run which made dgit push
+    --dry-run often not work at all.
 
  --
 

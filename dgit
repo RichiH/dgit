@@ -680,8 +680,7 @@ sub is_fast_fwd ($$) {
 }
 
 sub git_fetch_us () {
-    badusage "cannot dry run with fetch" if $dryrun;
-    runcmd @git, qw(fetch),access_giturl(),fetchspec();
+    runcmd_ordryrun @git, qw(fetch),access_giturl(),fetchspec();
 }
 
 sub fetch_from_archive () {
@@ -768,7 +767,7 @@ sub clone ($) {
     if (check_for_git()) {
 	print "fetching existing git history\n";
 	git_fetch_us();
-	runcmd @git, qw(fetch origin);
+	runcmd_ordryrun @git, qw(fetch origin);
     } else {
 	print "starting new git history\n";
     }
