@@ -922,7 +922,7 @@ sub dopush () {
 	    $keyid = access_cfg('keyid','RETURN-UNDEF');
 	}
 	my @tag_cmd = (@git, qw(tag -s -m),
-		       "Release $dversion for $csuite [dgit]");
+		       "$package release $dversion for $csuite [dgit]");
 	push @tag_cmd, qw(-u),$keyid if defined $keyid;
 	push @tag_cmd, $tag;
 	runcmd_ordryrun @tag_cmd;

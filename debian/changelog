@@ -1,3 +1,9 @@
+dgit (0.14) unstable; urgency=low
+
+  * Include package name in tag message.
+
+ --
+
 dgit (0.13) unstable; urgency=low
 
   * Reuse already-downloaded .orig files after checking their hashes.
