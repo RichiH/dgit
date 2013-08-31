@@ -4,6 +4,8 @@ Priority: optional
 Maintainer: Ian Jackson <ijackson@chiark.greenend.org.uk>
 Standards-Version: 3.9.4.0
 Build-Depends: debhelper (>= 9)
+Vcs-Git: git://anonscm.debian.org/dgit-repos/repos/dgit.git
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=dgit-repos/repos/dgit.git
 
 Package: dgit
 Depends: perl, libwww-perl, libdpkg-perl, git-core, devscripts, dpkg-dev,
