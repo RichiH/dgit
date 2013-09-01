@@ -2,6 +2,9 @@ dgit (0.14) unstable; urgency=low
 
   * Include package name in tag message.
   * Create directory .git/dgit when needed during build.  Closes: #721428.
+  * Add Vcs-Git and Vcs-Browser [Richard Hartmann].  Closes: #721404.
+    These fields refer to the development branch, "master", on alioth,
+    not to the dgit suite refs (which are not accessible to git clone).
 
  --
 
