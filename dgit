@@ -1055,6 +1055,7 @@ sub build_maybe_quilt_fixup () {
     my $ncommits = 3;
     my $patchname = "auto-$version-$headref-$time";
     my $msg = cmdoutput @git, qw(log), "-n$ncommits";
+    mkpath '.git/dgit';
     my $descfn = ".git/dgit/quilt-description.tmp";
     open O, '>', $descfn or die "$descfn: $!";
     $msg =~ s/\n/\n /g;

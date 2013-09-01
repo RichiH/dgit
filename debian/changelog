@@ -1,6 +1,7 @@
 dgit (0.14) unstable; urgency=low
 
   * Include package name in tag message.
+  * Create directory .git/dgit when needed during build.  Closes: #721428.
 
  --
 
