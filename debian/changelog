@@ -6,7 +6,7 @@ dgit (0.14) unstable; urgency=low
     These fields refer to the development branch, "master", on alioth,
     not to the dgit suite refs (which are not accessible to git clone).
 
- --
+ -- Ian Jackson <ijackson@chiark.greenend.org.uk>  Sun, 01 Sep 2013 18:30:44 +0100
 
 dgit (0.13) unstable; urgency=low
 
