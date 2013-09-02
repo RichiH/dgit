@@ -28,6 +28,8 @@ use File::Basename;
 use Dpkg::Version;
 use POSIX;
 
+our $dgit_version = 0.14;
+
 our $isuite = 'unstable';
 our $idistro;
 our $package;
@@ -1197,6 +1199,10 @@ sub cmd_quilt_fixup {
     my $clogp = parsechangelog();
     $version = getfield $clogp, 'Version';
     build_maybe_quilt_fixup();
+}
+
+sub cmd_version {
+	print "dgit version $dgit_version\n";
 }
 
 sub parseopts () {
