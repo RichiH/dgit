@@ -994,6 +994,10 @@ sub cmd_fetch {
     fetch();
 }
 
+sub cmd_help {
+	print STDOUT "$us: @_\n", $helpmsg or die $!;
+}
+
 sub cmd_pull {
     parseopts();
     fetchpullargs();
