@@ -230,7 +230,7 @@ sub badusage {
     exit 8;
 }
 
-sub helponly () {
+sub cmd_help () {
     print $helpmsg or die $!;
     exit 0;
 }
@@ -1211,7 +1211,7 @@ sub parseopts () {
 	    } elsif (m/^--no-sign$/) {
 		$sign=0;
 	    } elsif (m/^--help$/) {
-		helponly();
+		cmd_help();
 	    } elsif (m/^--new$/) {
 		$new_package=1;
 	    } elsif (m/^--(\w+)=(.*)/s &&
@@ -1241,7 +1241,7 @@ sub parseopts () {
 		if (s/^-n/-/) {
 		    $dryrun=1;
 		} elsif (s/^-h/-/) {
-		    helponly();
+		    cmd_help();
 		} elsif (s/^-D/-/) {
 		    open DEBUG, ">&STDERR" or die $!;
 		    $debug++;
